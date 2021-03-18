@@ -8,11 +8,9 @@
 (cond-expand
   (gauche
    (load "./arch.scm")
-   (load "./arch/x86_64.scm")))
+   (load "./arch/x86_64.scm"))
+   (load "./frontend.scm"))
 
 (import (pscheme arch)
-        (pscheme arch x86_64))
-
-(define (is-syntax? sym form)
-  (and (pair? form)
-       (eq? (car form) sym)))
+        (pscheme arch x86_64)
+        (pscheme frontend))
