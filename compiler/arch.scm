@@ -3,8 +3,10 @@
           (scheme file)
           (gauche base)) ;; TODO remove
   (export compile-environment
+          enter-block-environment
           emit
-          unique)
+          unique
+          genlabel)
   (begin
 
     (define (make-unique)
@@ -18,8 +20,16 @@
     (define arch-param (make-parameter '()))
     (define unique (make-parameter (make-unique)))
 
+    (define (genlabel prefix)
+      (format "~a_~a" prefix ((unique))))
+
+    (define (maybe-call-with-output-file filename proc)
+      (if (eq? filename 'stdout)
+          (proc (current-output-port))
+          (call-with-output-file filename proc)))
+
     (define (compile-environment filename arch proc)
-      (call-with-output-file filename
+      (maybe-call-with-output-file filename
         (lambda (port)
           (parameterize ((port-param port)
                          (real-port-param port)
@@ -39,14 +49,14 @@
                     (port-param)))
 
 
-
     ))
 
 ;; Conventions of emit
 ;;
 ;; 1. a symbol 'result indicates the register that holds the result of the last expression executed
-;; 2. (b n) indicates an offset from the base pointer (locals)
-;; 2. (a n) indicates the nth argument.
-;; 3. (s n) indicates an offset from the stack pointer (n is positive no matter the direction of the stack)
-;; 4. (global 'symbol) indicates a global symbol reference
+;; 2. (stack n) indicates an offset from the base pointer (locals)
+;; 2. (temp n) indicates an offset from the stack pointer (nested expressions)
+;; 2. (arg n) indicates the nth argument.
+;; 2. (closure n) indicates the nth element of the closure.
+;; 4. (global 'symbol) indicates a global symbol reference.
 ;; 5. a number will be treated as an immediate

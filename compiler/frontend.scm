@@ -1,12 +1,9 @@
 (define-library (pscheme frontend)
   (import (scheme base)
-          (scheme cxr))
+          (scheme cxr)
+          (pscheme util))
   (export frontend)
   (begin
-
-    (define (is-syntax? sym form)
-      (and (pair? form)
-           (eq? (car form) sym)))
 
     (define-record-type frame
       (make-frame args locals closure parent)
