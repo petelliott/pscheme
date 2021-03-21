@@ -10,9 +10,9 @@
     (define (codegen-main-file stmts)
       (enter-block-environment
        (lambda ()
-         (emit 'prologue "main")
+         (emit 'c-prologue "main")
          (for-each codegen-stmt stmts)
-         (emit 'epilogue))))
+         (emit 'c-epilogue))))
 
     (define (codegen-stmt stmt)
       (case (car stmt)
@@ -55,7 +55,14 @@
       (emit 'load-lambda label))
 
     (define (codegen-call expr)
-      #f)
+      (codegen-expr (cadr expr))
+      (emit 'prepare)
+      (emit 'pusharg) ;; TODO: put an actual value for closure
+      (for-each (lambda (expr)
+                  (codegen-expr expr)
+                  (emit 'pusharg))
+                (cddr expr))
+      (emit 'call (length (cddr expr))))
 
     (define (codegen-if expr)
       #f)
