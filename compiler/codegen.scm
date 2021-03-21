@@ -65,6 +65,12 @@
       (emit 'call (length (cddr expr))))
 
     (define (codegen-if expr)
-      #f)
+      (define label (genlabel ""))
+      (codegen-expr (cadr expr))
+      (emit 'if-prologue label)
+      (codegen-expr (caddr expr))
+      (emit 'if-middle label)
+      (codegen-expr (cadddr expr))
+      (emit 'if-end label))
 
     ))

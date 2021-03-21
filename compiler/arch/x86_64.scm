@@ -21,7 +21,7 @@
           (format "~a(%esp)" (- (* (cdr ref) word-size))))
        ((is-syntax? 'arg ref)
         ;; +1 is for the closure, which is the first argument
-        (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
+        (format "~a(%rdi)" (* (+ (cadr ref) 1) word-size)))
        ((is-syntax? 'global ref)
         (format "~a(%rip)" (mangle (cadr ref))))
        ((integer? ref)
@@ -61,7 +61,7 @@
 
     (define (if-prologue key)
       ;; TODO: replace $0 with false value
-      (format "    cmp $0, %rax\n    je _if_false_~a" key))
+      (format "    cmp $0, %rax\n    je _if_false_~a\n" key))
 
     (define (if-middle key)
       (format "    jmp _if_end_~a\n_if_false_~a:\n" key key))
