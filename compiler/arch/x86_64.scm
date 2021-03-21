@@ -8,9 +8,10 @@
     (define word-size 8)
 
     ;; registers:
-    ;; result register:  %rax (caller saved)
-    ;; frame pointer:    %rbp (callee saved)
-    ;; argument pointer: %rdi (caller saved)
+    ;; result register:     %rax (caller saved)
+    ;; frame pointer:       %rbp (callee saved)
+    ;; argument pointer:    %rdi (caller saved)
+    ;; temporary registers: %r11 (caller saved)
 
     (define (x86-arg ref)
       (cond
@@ -20,8 +21,7 @@
        #;((is-syntax? 'temp ref)
           (format "~a(%esp)" (- (* (cdr ref) word-size))))
        ((is-syntax? 'arg ref)
-        ;; +1 is for the closure, which is the first argument
-        (format "~a(%rdi)" (* (+ (cadr ref) 1) word-size)))
+        (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
        ((is-syntax? 'global ref)
         (format "~a(%rip)" (mangle (cadr ref))))
        ((integer? ref)
@@ -80,10 +80,10 @@
 
 ;;; pscheme calling convention
     (define (prologue label)
-      (format "\n    .text\n    .global ~a\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label label))
+      (format "\n    .text\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label))
 
     (define (epilogue)
-      "    mov %rbp, %rsp\n    pop %rbp\n    mov %rdi, %rsp\n    ret\n")
+      "    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
 
     (define (prepare)
       "    push %rax\n    push %rdi\n")
@@ -92,14 +92,14 @@
       "    push %rax\n")
 
     (define (call nargs)
-      (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    pop %rdi\n    add $4, %rsp\n"
-              (- (* word-size (+ nargs 1)))
-              (- (* word-size (+ nargs 2)))))
+      (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    pop %rdi\n    add $8, %rsp\n"
+              (* word-size nargs)
+              (* word-size (+ nargs 1))))
 
 ;;; C calling convention
 
     (define (c-prologue label)
-      (prologue label))
+      (format "\n    .text\n    .global ~a\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label label))
 
     (define (c-epilogue)
       "    mov %rbp, %rsp\n    pop %rbp\n    ret\n")

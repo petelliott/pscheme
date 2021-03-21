@@ -57,7 +57,6 @@
     (define (codegen-call expr)
       (codegen-expr (cadr expr))
       (emit 'prepare)
-      (emit 'pusharg) ;; TODO: put an actual value for closure
       (for-each (lambda (expr)
                   (codegen-expr expr)
                   (emit 'pusharg))
