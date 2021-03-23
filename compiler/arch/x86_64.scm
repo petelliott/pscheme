@@ -10,7 +10,7 @@
     ;; registers:
     ;; result register:     %rax (caller saved)
     ;; frame pointer:       %rbp (callee saved)
-    ;; argument pointer:    %rdi (caller saved)
+    ;; argument pointer:    %rdi (caller and callee saved)
     ;; temporary registers: %r11 (caller saved)
 
     (define (x86-arg ref)
@@ -83,7 +83,8 @@
       (format "\n    .text\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label))
 
     (define (epilogue)
-      "    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
+      ;"    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
+      "    mov %rbp, %rsp\n    pop %rbp\n    ret\n")
 
     (define (prepare)
       "    push %rax\n    push %rdi\n")
@@ -92,7 +93,7 @@
       "    push %rax\n")
 
     (define (call nargs)
-      (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    pop %rdi\n    add $8, %rsp\n"
+      (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
               (* word-size nargs)
               (* word-size (+ nargs 1))))
 
