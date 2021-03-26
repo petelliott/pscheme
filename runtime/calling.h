@@ -3,9 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-
-// TODO: move this to object.h
-typedef uintptr_t pscheme_t;
+#include <runtime/object.h>
 
 #define pscheme_start()                                                 \
     size_t     _pscheme_nargs;                                          \
@@ -18,8 +16,9 @@ typedef uintptr_t pscheme_t;
 #define pscheme_arg(n) (_pscheme_args[-n-1])
 
 #define pscheme_return(val)                                        \
+    pscheme_t result = val;                                        \
     asm volatile ("mov %0, %%rdi" :: "r" (_pscheme_args) : "rdi"); \
-    return val;
+    return result;
 
 
 #define pscheme_fn(name)                                        \

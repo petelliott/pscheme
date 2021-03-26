@@ -24,9 +24,41 @@
         (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
        ((is-syntax? 'global ref)
         (format "~a(%rip)" (mangle (cadr ref))))
-       ((integer? ref)
-        (format "$~a" ref))
        (else (error "unsupported reference format " ref))))
+
+
+
+;;; tagged pointer representation
+    (define max-fixnum (expt 2 60))
+    (define (numeric-representation n)
+      (* (modulo n max-fixnum) 16))
+
+    (define-syntax enum
+      (syntax-rules ()
+        ((_ name values ...)
+         (begin
+           (define cnt -1)
+           (define values (begin (set! cnt (+ cnt 1)))) ...))))
+
+    (enum tags
+          PSCM-T-FIXNUM
+          PSCM-T-CONS
+          PSCM-T-SINGLETON)
+
+    (enum singletons
+          PSCM-S-NIL
+          PSCM-S-F
+          PSCM-S-T
+          PSCM-S-EOF
+          PSCM-S-UNSPECIFIED
+          PSCM-S-UNBOUND)
+
+
+    (define (tag-pointer ptr tag)
+      (+ ptr tag))
+
+    (define (tag-number num tag)
+      (+ (numeric-representation num) tag))
 
 ;;; general purpose operations:
 
@@ -61,7 +93,7 @@
 
     (define (if-prologue key)
       ;; TODO: replace $0 with false value
-      (format "    cmp $0, %rax\n    je _if_false_~a\n" key))
+      (format "    cmp $~a, %rax\n    je _if_false_~a\n" (tag-number PSCM-S-F PSCM-T-SINGLETON) key))
 
     (define (if-middle key)
       (format "    jmp _if_end_~a\n_if_false_~a:\n" key key))
@@ -77,6 +109,8 @@
     (define (load-lambda label)
       (format "    lea ~a(%rip), %rax\n" label))
 
+    (define (fixnum-literal value)
+      (format "    mov $~a, %rax\n" (tag-number value PSCM-T-FIXNUM)))
 
 ;;; pscheme calling convention
     (define (prologue label)
@@ -103,7 +137,7 @@
       (format "\n    .text\n    .global ~a\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label label))
 
     (define (c-epilogue)
-      "    mov %rbp, %rsp\n    pop %rbp\n    ret\n")
+      "    xor %rax, %rax\n    mov %rbp, %rsp\n    pop %rbp\n    ret\n")
 
     (define x86_64
       `((add . ,add)
@@ -125,6 +159,7 @@
         (pusharg . ,pusharg)
         (call . ,call)
         (c-prologue . ,c-prologue)
-        (c-epilogue . ,c-epilogue)))
+        (c-epilogue . ,c-epilogue)
+        (fixnum-literal . ,fixnum-literal)))
 
     ))

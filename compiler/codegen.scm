@@ -42,7 +42,7 @@
 
     (define (codegen-literal literal)
       (cond
-       ((integer? literal) (emit 'mov literal 'result))
+       ((integer? literal) (emit 'fixnum-literal literal))
        (else (error "can't generate code for literal: " literal))))
 
     (define (codegen-lambda expr)
