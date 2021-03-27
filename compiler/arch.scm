@@ -5,6 +5,7 @@
   (export compile-environment
           enter-block-environment
           emit
+          emit-eval
           unique
           genlabel)
   (begin
@@ -47,6 +48,9 @@
     (define (emit key . rest)
       (write-string (apply (cdr (assq key (arch-param))) rest)
                     (port-param)))
+
+    (define (emit-eval key . rest)
+      (apply (cdr (assq key (arch-param))) rest))
 
 
     ))

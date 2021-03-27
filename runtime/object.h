@@ -13,9 +13,16 @@ enum pscheme_tags {
 
 typedef uintptr_t pscheme_t;
 
+static inline uintptr_t sra(uintptr_t x, uintptr_t y) {
+    uintptr_t bottom = x >> y;
+    uintptr_t top = -((x & (1lu << 63)) >> y);
+    return top | bottom;
+}
+
+
 static inline void *ptr(pscheme_t obj) { return (void *)(obj & ~0xf); }
 static inline uintptr_t unum(pscheme_t obj) { return obj >> 4; }
-static inline intptr_t num(pscheme_t obj) { return (intptr_t)(obj >> 4); }
+static inline intptr_t num(pscheme_t obj) { return (intptr_t)(sra(obj, 4)); }
 static inline uintptr_t tag(pscheme_t obj) { return obj & 0xf; }
 
 struct pscheme_cons_cell {

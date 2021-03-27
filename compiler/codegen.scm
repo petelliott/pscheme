@@ -40,10 +40,24 @@
         ((closure) (codegen-expr (cadr expr))) ;; TODO: add closure support
         (else (error "unsuported expression " expr))))
 
+    (define (codegen-literal-inner literal)
+      (cond
+       ((integer? literal) (emit-eval 'fixnum-literal literal))
+       ((member literal '(() #f #t)) (emit-eval 'singleton-literal literal))
+       ((pair? literal)
+        (let ((left (codegen-literal-inner (car literal)))
+              (right (codegen-literal-inner (cdr literal)))
+              (label (genlabel "pscm_cons")))
+          (enter-block-environment
+           (lambda () (emit 'cons-literal label left right)))
+          (emit-eval 'tag-cons-label label)))
+       (else (error "can't generate code for literal: " literal))))
+
     (define (codegen-literal literal)
       (cond
-       ((integer? literal) (emit 'fixnum-literal literal))
-       (else (error "can't generate code for literal: " literal))))
+       ((pair? literal) (emit 'load-data-literal (codegen-literal-inner literal)))
+       (else (emit 'load-immediate-literal (codegen-literal-inner literal)))))
+      ;(codegen-literal-inner literal))
 
     (define (codegen-lambda expr)
       (define label (genlabel "pscm_lambda"))

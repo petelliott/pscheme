@@ -26,8 +26,6 @@
         (format "~a(%rip)" (mangle (cadr ref))))
        (else (error "unsupported reference format " ref))))
 
-
-
 ;;; tagged pointer representation
     (define max-fixnum (expt 2 60))
     (define (numeric-representation n)
@@ -104,13 +102,36 @@
     (define (global-define-slot sym)
       (define label (mangle sym))
       ;; TODO: replace 0 with undefined constant
-      (format "    .data\n    .global ~a\n~a:\t.8byte 0\n" label label))
+      (format "    .data\n    .global ~a\n    .align 8\n~a:\t.8byte 0\n" label label))
 
     (define (load-lambda label)
       (format "    lea ~a(%rip), %rax\n" label))
 
+    ;(define (load-literal literal)
+    ;  (format "    mov $~a, %rax\n" literal))
+
+;;; literal representations
     (define (fixnum-literal value)
-      (format "    mov $~a, %rax\n" (tag-number value PSCM-T-FIXNUM)))
+      (format "~a" (tag-number value PSCM-T-FIXNUM)))
+
+    (define (singleton-literal value)
+      (format "~a"
+              (tag-number (case value
+                              ((()) PSCM-S-NIL)
+                              ((#f) PSCM-S-F)
+                              ((#t) PSCM-S-T)) PSCM-T-SINGLETON)))
+
+    (define (cons-literal label left right)
+      (format "    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label left right))
+
+    (define (tag-cons-label label)
+      (format "(~a + ~a)" label PSCM-T-CONS))
+
+    (define (load-immediate-literal literal)
+      (format "    mov $~a, %rax\n" literal))
+
+    (define (load-data-literal literal)
+      (format  "    lea ~a(%rip), %rax\n" literal))
 
 ;;; pscheme calling convention
     (define (prologue label)
@@ -160,6 +181,11 @@
         (call . ,call)
         (c-prologue . ,c-prologue)
         (c-epilogue . ,c-epilogue)
-        (fixnum-literal . ,fixnum-literal)))
+        (fixnum-literal . ,fixnum-literal)
+        (singleton-literal . ,singleton-literal)
+        (cons-literal . ,cons-literal)
+        (tag-cons-label . ,tag-cons-label)
+        (load-immediate-literal . ,load-immediate-literal)
+        (load-data-literal . ,load-data-literal)))
 
     ))
