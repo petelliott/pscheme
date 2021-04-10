@@ -1,8 +1,8 @@
-(define-library (pscheme codegen)
+(define-library (pscheme compiler codegen)
   (import (scheme base)
           (scheme cxr)
-          (pscheme arch)
-          (pscheme util))
+          (pscheme compiler arch)
+          (pscheme compiler util))
   (export codegen-main-file)
 
   (begin
@@ -57,7 +57,6 @@
       (cond
        ((pair? literal) (emit 'load-data-literal (codegen-literal-inner literal)))
        (else (emit 'load-immediate-literal (codegen-literal-inner literal)))))
-      ;(codegen-literal-inner literal))
 
     (define (codegen-lambda expr)
       (define label (genlabel "pscm_lambda"))

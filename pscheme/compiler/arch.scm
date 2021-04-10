@@ -1,4 +1,4 @@
-(define-library (pscheme arch)
+(define-library (pscheme compiler arch)
   (import (scheme base)
           (scheme file)
           (gauche base)) ;; TODO remove

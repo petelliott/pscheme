@@ -5,19 +5,10 @@
         (scheme read)
         (scheme write))
 
-;; the loads are not neccessary, or available, when compiled
-(cond-expand
-  (gauche
-   (load "./compiler/util.scm")
-   (load "./compiler/arch.scm")
-   (load "./compiler/arch/x86_64.scm")
-   (load "./compiler/frontend.scm")
-   (load "./compiler/codegen.scm")))
-
-(import (pscheme arch)
-        (pscheme arch x86_64)
-        (pscheme frontend)
-        (pscheme codegen))
+(import (pscheme compiler arch)
+        (pscheme compiler arch x86_64)
+        (pscheme compiler frontend)
+        (pscheme compiler codegen))
 
 (define (read-all)
   (define obj (read))

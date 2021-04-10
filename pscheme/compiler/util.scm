@@ -1,4 +1,4 @@
-(define-library (pscheme util)
+(define-library (pscheme compiler util)
   (import (scheme base)
           (srfi-28))
   (export is-syntax?

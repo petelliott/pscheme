@@ -1,7 +1,7 @@
-(define-library (pscheme frontend)
+(define-library (pscheme compiler frontend)
   (import (scheme base)
           (scheme cxr)
-          (pscheme util))
+          (pscheme compiler util))
   (export frontend)
   (begin
 

@@ -12,7 +12,7 @@ $(RUNTIME_TARGET): $(RUNTIME_OBJS)
 
 
 %.elf: %.scm $(RUNTIME_TARGET)
-	gosh -r7 compiler/main.scm < $< | $(CC) $(CFLAGS) -o $@ -xassembler - -xnone $(RUNTIME_TARGET)
+	gosh -I. -r7 pscheme/compiler/main.scm < $< | $(CC) $(CFLAGS) -o $@ -xassembler - -xnone $(RUNTIME_TARGET)
 
 .PHONY: clean
 

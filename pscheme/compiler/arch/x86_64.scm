@@ -1,7 +1,7 @@
-(define-library (pscheme arch x86_64)
+(define-library (pscheme compiler arch x86_64)
   (import (scheme base)
           (srfi-28)
-          (pscheme util))
+          (pscheme compiler util))
   (export x86_64)
   (begin
 
