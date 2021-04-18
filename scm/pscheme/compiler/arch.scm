@@ -7,7 +7,8 @@
           emit
           emit-eval
           unique
-          genlabel)
+          genlabel
+          current-target)
   (begin
 
     (define (make-unique)
@@ -20,6 +21,9 @@
     (define real-port-param (make-parameter #f))
     (define arch-param (make-parameter '()))
     (define unique (make-parameter (make-unique)))
+
+    (define (current-target)
+      (arch-param))
 
     (define (genlabel prefix)
       (format "~a_~a" prefix ((unique))))

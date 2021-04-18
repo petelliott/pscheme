@@ -1,5 +1,6 @@
 (define-library (pscheme compiler arch x86_64)
   (import (scheme base)
+          (scheme cxr)
           (srfi-28)
           (pscheme compiler util))
   (export x86_64)
@@ -23,7 +24,7 @@
        ((is-syntax? 'arg ref)
         (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
        ((is-syntax? 'global ref)
-        (format "~a(%rip)" (mangle (cadr ref))))
+        (format "~a(%rip)" (mangle (cadr ref) (caddr ref))))
        (else (error "unsupported reference format " ref))))
 
 ;;; tagged pointer representation
@@ -99,8 +100,8 @@
     (define (if-end key)
       (format "_if_end_~a:\n" key))
 
-    (define (global-define-slot sym)
-      (define label (mangle sym))
+    (define (global-define-slot lib sym)
+      (define label (mangle lib sym))
       ;; TODO: replace 0 with undefined constant
       (format "    .data\n    .global ~a\n    .align 8\n~a:\t.8byte 0\n" label label))
 
@@ -160,6 +161,9 @@
     (define (c-epilogue)
       "    xor %rax, %rax\n    mov %rbp, %rsp\n    pop %rbp\n    ret\n")
 
+    (define (c-call label)
+      (format "    call ~a\n" label))
+
     (define x86_64
       `((add . ,add)
         (sub . ,sub)
@@ -181,6 +185,7 @@
         (call . ,call)
         (c-prologue . ,c-prologue)
         (c-epilogue . ,c-epilogue)
+        (c-call . ,c-call)
         (fixnum-literal . ,fixnum-literal)
         (singleton-literal . ,singleton-literal)
         (cons-literal . ,cons-literal)

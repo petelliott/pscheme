@@ -1,0 +1,134 @@
+(define-library (pscheme compiler frontend)
+  (import (scheme base)
+          (scheme cxr)
+          (pscheme compiler util)
+          (pscheme compiler arch)
+          (pscheme compiler arch x86_64)
+          (pscheme compiler compile)
+          (pscheme compiler library))
+  (export frontend)
+  (begin
+
+    (define-record-type frame
+      (make-frame args locals closure parent)
+      frame?
+      (args frame-args)
+      (locals frame-locals set-frame-locals!)
+      (closure frame-closure set-frame-closure!)
+      (parent frame-parent))
+
+    (define (new-frame args parent)
+      (make-frame args '() '() parent))
+
+    (define (define-var! sym frame)
+      (if (not (null? frame))
+          (set-frame-locals! frame (cons sym (frame-locals frame)))))
+
+    (define (lookup-var! sym frame)
+      (cond
+       ((null? frame) (lookup-global sym))
+       ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
+       ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
+       ((assq sym (frame-closure frame))  (assq sym (frame-closure frame)))
+       (else
+        (let ((parent-ref (lookup-var! sym (frame-parent frame))))
+          (if (is-syntax? 'global parent-ref)
+              parent-ref
+              (begin
+                (set-frame-closure! frame (cons parent-ref (frame-closure frame)))
+                `(closure ,(- (length (frame-closure frame)) 1))))))))
+
+    (define (dump-frame frame)
+      (if (null? frame)
+          '()
+          (cons
+           (list (frame-args frame)
+                 (frame-locals frame)
+                 (frame-closure frame))
+           (dump-frame (frame-parent frame)))))
+
+    ;;; the frontend makes all syntax explicit and figures out variable references and closures
+
+    (define (frontend form)
+      (frontend-toplevel form))
+
+    (define (frontend-toplevel form)
+      (cond
+       ((is-syntax? 'define-library form) (frontend-library form))
+       ((is-syntax? 'import form)         (frontend-import form))
+       (else (frontend-stmt form '()))))
+
+    (define (accumulate-library-decls forms imports exports begins)
+      (if (null? forms)
+          (values imports exports begins)
+          (accumulate-library-decls (cdr forms)
+                              (if (is-syntax? 'import (car forms)) (append imports (cdar forms)) imports)
+                              (if (is-syntax? 'export (car forms)) (append exports (cdar forms)) exports)
+                              (if (is-syntax? 'begin (car forms)) (append begins (cdar forms)) begins))))
+
+    (define (frontend-library form)
+      (define name (cadr form))
+      (define-values (imports exports begins) (accumulate-library-decls (cddr form) '() '() '()))
+      (define lib (new-library name
+                               (map (lambda (imprt)
+                                      (or (lookup-library imprt)
+                                          ;; TODO: set arch dynamically
+                                          (compile-file x86_64 (library-filename imprt) 'library))
+                                      (lookup-library imprt))
+                                    imports)
+                               exports))
+      (parameterize ((current-library lib))
+        `(define-library ,name
+           ,@(map (lambda (imprt) `(import ,imprt)) imports)
+           ,@(map (lambda (form) (frontend-stmt form '())) begins))))
+
+    (define (frontend-import form)
+      `(begin
+         ,@(map (lambda (imprt)
+                  (or (lookup-library (cdr form))
+                      ;; TODO: set arch dynamically
+                      (compile-file x86_64 (library-filename imprt) 'library))
+                  `(import ,imprt))
+                (cdr form))))
+
+    (define (frontend-stmt form scope)
+      (cond
+       ((is-syntax? 'define form)
+        (frontend-define form scope))
+       ((is-syntax? 'begin form) `(begin ,@(map (lambda (form) (frontend-stmt form scope)) (cdr form))))
+       (else (frontend-expr form scope))))
+
+    (define (frontend-define form scope)
+      (cond
+       ((pair? (cadr form))
+        (frontend-define `(define ,(caadr form) (lambda ,(cdadr form) ,@(cddr form))) scope))
+       (else
+        (define-var! (cadr form) scope)
+        `(define ,(lookup-var! (cadr form) scope) ,(frontend-expr (caddr form) scope)))))
+
+    (define (frontend-expr form scope)
+      (cond
+       ((is-syntax? 'quote form) form)
+       ((is-syntax? 'begin form) `(begin ,@(map (lambda (form) (frontend-expr form scope)) (cdr form))))
+       ((is-syntax? 'define form) (error "define in expression context"))
+       ((is-syntax? 'if form)
+        `(if ,(frontend-expr (cadr form) scope)
+             ,(frontend-expr (caddr form) scope)
+             ,(frontend-expr (cadddr form) scope)))
+       ((is-syntax? 'set! form)
+        `(set! ,(lookup-var! (cadr form)) ,(frontend-expr (caddr form) scope)))
+       ((is-syntax? 'lambda form) (frontend-lambda form scope))
+       ((pair? form) (cons 'call (map (lambda (form) (frontend-expr form scope)) form)))
+       ((symbol? form) `(ref ,(lookup-var! form scope)))
+       (else `(quote ,form))))
+
+    (define (frontend-lambda form scope)
+      (define new-scope (new-frame (reverse (cadr form)) scope))
+      (define body (map (lambda (form) (frontend-stmt form new-scope)) (cddr form)))
+      `(closure
+        (lambda ,(cadr form)
+          (push-locals ,(length (frame-locals new-scope)))
+          ,@body)
+        ,@(reverse (frame-closure new-scope))))
+
+    ))

@@ -1,10 +1,11 @@
 (define-library (pscheme compiler codegen)
   (import (scheme base)
           (scheme cxr)
+          (scheme write)
           (pscheme compiler arch)
           (pscheme compiler util))
-  (export codegen-main-file)
-
+  (export codegen-main-file
+          codegen-library-file)
   (begin
 
     (define (codegen-main-file stmts)
@@ -14,20 +15,43 @@
          (for-each codegen-stmt stmts)
          (emit 'c-epilogue))))
 
+    (define (codegen-library-file stmts)
+      (for-each codegen-library-toplevel stmts))
+
+    (define (codegen-library-toplevel stmt)
+      (case (car stmt)
+        ((define-library) (codegen-define-library stmt))
+        (else (error "unexpected statement in library file context:" stmt))))
+
+    (define (library-entry lib)
+      (string-append "pscm_entry_" (mangle-library lib)))
+
+    (define (codegen-define-library form)
+      (enter-block-environment
+       (lambda ()
+         (emit 'c-prologue (library-entry (cadr form)))
+         (for-each codegen-stmt (cddr form))
+         (emit 'c-epilogue))))
+
     (define (codegen-stmt stmt)
       (case (car stmt)
        ((define) (codegen-define stmt))
+       ((import) (codegen-import stmt))
        ((push-locals)
         (when (> (cadr stmt) 0)
           (emit 'stack-alloc (cadr stmt))))
+       ((begin) (for-each codegen-stmt (cdr stmt)))
        (else (codegen-expr stmt))))
 
     (define (codegen-define stmt)
       (when (is-syntax? 'global (cadr stmt))
         (enter-block-environment (lambda ()
-                                   (emit 'global-define-slot (cadadr stmt)))))
+                                   (emit 'global-define-slot (cadadr stmt) (car (cddadr stmt))))))
       (codegen-expr (caddr stmt))
       (emit 'mov 'result (cadr stmt)))
+
+    (define (codegen-import stmt)
+      (emit 'c-call (library-entry (cadr stmt))))
 
     ;; exprs always put their result in the 'result register
     (define (codegen-expr expr)
@@ -38,6 +62,7 @@
         ((call)    (codegen-call expr))
         ((if)      (codegen-if expr))
         ((closure) (codegen-expr (cadr expr))) ;; TODO: add closure support
+        ((begin)   (for-each codegen-expr (cdr expr)))
         (else (error "unsuported expression " expr))))
 
     (define (codegen-literal-inner literal)
