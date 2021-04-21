@@ -3,8 +3,6 @@
           (scheme cxr)
           (pscheme compiler util)
           (pscheme compiler arch)
-          (pscheme compiler arch x86_64)
-          (pscheme compiler compile)
           (pscheme compiler library))
   (export frontend)
   (begin
@@ -69,15 +67,9 @@
     (define (frontend-library form)
       (define name (cadr form))
       (define-values (imports exports begins) (accumulate-library-decls (cddr form) '() '() '()))
-      (define lib (new-library name
-                               (map (lambda (imprt)
-                                      (or (lookup-library imprt)
-                                          ;; TODO: set arch dynamically
-                                          (compile-file x86_64 (library-filename imprt) 'library))
-                                      (lookup-library imprt))
-                                    imports)
-                               exports))
+      (define lib (new-library name () exports))
       (parameterize ((current-library lib))
+        (for-each compile-and-import imports)
         `(define-library ,name
            ,@(map (lambda (imprt) `(import ,imprt)) imports)
            ,@(map (lambda (form) (frontend-stmt form '())) begins))))
@@ -85,9 +77,7 @@
     (define (frontend-import form)
       `(begin
          ,@(map (lambda (imprt)
-                  (or (lookup-library (cdr form))
-                      ;; TODO: set arch dynamically
-                      (compile-file x86_64 (library-filename imprt) 'library))
+                  (compile-and-import imprt)
                   `(import ,imprt))
                 (cdr form))))
 

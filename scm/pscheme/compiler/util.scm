@@ -32,12 +32,12 @@
                       str))
 
     (define (mangle-library name)
-      (string-join "." (append (map (lambda (sym) (sanitize-chars (symbol->string sym)))
+      (string-join "$$" (append (map (lambda (sym) (sanitize-chars (symbol->string sym)))
                                     name))))
     (define (mangle lib sym)
       (string-append "pscm_sym_"
                      (mangle-library lib)
-                     "."
+                     "$$"
                      (sanitize-chars (symbol->string sym))))
 
 

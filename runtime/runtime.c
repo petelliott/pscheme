@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 // $2b$ = +
-pscheme_fn($2b$) {
+pscheme_fn(scheme$$base$$$2b$) {
     pscheme_start();
     long acc = 0;
     for (long i = 0; i < pscheme_nargs(); ++i) {
@@ -14,7 +14,7 @@ pscheme_fn($2b$) {
 }
 
 // <=
-pscheme_fn($3c$$3d$) {
+pscheme_fn(scheme$$base$$$3c$$3d$) {
     pscheme_start();
     assert(pscheme_nargs() == 2);
     pscheme_t a = pscheme_arg(0);
@@ -24,26 +24,26 @@ pscheme_fn($3c$$3d$) {
     pscheme_return(make_pscm_bool(num(a) <= num(b)));
 }
 
-pscheme_fn(cons) {
+pscheme_fn(scheme$$base$$cons) {
     pscheme_start();
     assert(pscheme_nargs() == 2);
 
     pscheme_return(pscheme_cons(pscheme_arg(0), pscheme_arg(1)));
 }
 
-pscheme_fn(car) {
+pscheme_fn(scheme$$base$$car) {
     pscheme_start();
     assert(pscheme_nargs() == 1);
     pscheme_return(pscheme_car(pscheme_arg(0)));
 }
 
-pscheme_fn(cdr) {
+pscheme_fn(scheme$$base$$cdr) {
     pscheme_start();
     assert(pscheme_nargs() == 1);
     pscheme_return(pscheme_cdr(pscheme_arg(0)));
 }
 
-pscheme_fn(newline) {
+pscheme_fn(scheme$$base$$newline) {
     pscheme_start();
     assert(pscheme_nargs() == 0);
     printf("\n");
@@ -79,7 +79,7 @@ static void pscheme_write(pscheme_t obj) {
     }
 }
 
-pscheme_fn(write) {
+pscheme_fn(scheme$$base$$write) {
     pscheme_start();
     assert(pscheme_nargs() == 1);
 

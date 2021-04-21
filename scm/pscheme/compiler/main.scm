@@ -10,6 +10,8 @@
         (pscheme compiler compile)
         (pscheme compiler library))
 
+;; TODO: install this or something
 (add-to-load-path ".")
+(add-to-load-path "/home/peter/code/scheme/pscheme/scm")
 
 (compile-file x86_64 (cadr (command-line)) 'program)
