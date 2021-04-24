@@ -2,7 +2,8 @@
   (import (scheme base)
           (scheme cxr)
           (srfi-28)
-          (pscheme compiler util))
+          (pscheme compiler util)
+          (pscheme compiler arch))
   (export x86_64)
   (begin
 
@@ -164,6 +165,21 @@
     (define (c-call label)
       (format "    call ~a\n" label))
 
+;;; builtins
+
+    (define builtins `())
+
+    (define (builtin op narg)
+      ((cdr (assoc op builtins)) nargs))
+
+    (define (push-builtin-arg)
+      "    push %rax\n")
+
+    (define (pop-builtin-args n)
+      (format "    add $~a, %rax\n" (* n word-size)))
+
+;;; exported architecture
+
     (define x86_64
       `((add . ,add)
         (sub . ,sub)
@@ -191,6 +207,9 @@
         (cons-literal . ,cons-literal)
         (tag-cons-label . ,tag-cons-label)
         (load-immediate-literal . ,load-immediate-literal)
-        (load-data-literal . ,load-data-literal)))
+        (load-data-literal . ,load-data-literal)
+        (builtin . ,builtin)
+        (push-builtin-arg . ,push-builtin-arg)
+        (pop-builtin-args . ,pop-builtin-args)))
 
     ))

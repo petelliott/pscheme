@@ -63,6 +63,7 @@
         ((if)      (codegen-if expr))
         ((closure) (codegen-expr (cadr expr))) ;; TODO: add closure support
         ((begin)   (for-each codegen-expr (cdr expr)))
+        ((builtin) (codegen-builtin (cadr expr) (cddr expr)))
         (else (error "unsuported expression " expr))))
 
     (define (codegen-literal-inner literal)
@@ -109,5 +110,13 @@
       (emit 'if-middle label)
       (codegen-expr (cadddr expr))
       (emit 'if-end label))
+
+    (define (codegen-builtin builtin args)
+      (for-each (lambda (expr)
+                  (codegen-expr expr)
+                  (emit 'push-builtin-arg))
+                (cddr expr))
+      (emit 'builtin builtin args)
+      (emit 'pop-builtin-args (length args)))
 
     ))

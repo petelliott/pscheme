@@ -26,7 +26,7 @@
       (map-characters (lambda (ch)
                         (cond
                          ((char=? ch #\-) "_")
-                         ((or (letter? ch) (digit? ch) (char=? ch))
+                         ((or (letter? ch) (digit? ch))
                           (string ch))
                          (else (format "$~a$" (number->string (char->integer ch) 16)))))
                       str))
