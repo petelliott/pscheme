@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall -g -fno-omit-frame-pointer -I.
 
-RUNTIME_OBJS=runtime/runtime.o runtime/gc.o runtime/object.o
+RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/number.o runtime/list.o
 RUNTIME_TARGET=runtime/runtime.a
 
 $(RUNTIME_TARGET): $(RUNTIME_OBJS)
@@ -10,9 +10,6 @@ $(RUNTIME_TARGET): $(RUNTIME_OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 
-
-%.elf: %.scm $(RUNTIME_TARGET)
-	gosh -I. -r7 pscheme/compiler/main.scm < $< | $(CC) $(CFLAGS) -o $@ -xassembler - -xnone $(RUNTIME_TARGET)
 
 .PHONY: clean
 
