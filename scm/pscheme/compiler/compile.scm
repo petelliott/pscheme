@@ -4,11 +4,15 @@
           (scheme read)
           (scheme write)
           (srfi-28)
+          (pscheme string)
           (pscheme compiler arch)
           (pscheme compiler arch x86_64)
           (pscheme compiler frontend)
-          (pscheme compiler codegen))
-  (export compile-file)
+          (pscheme compiler codegen)
+          (only (gauche base) sys-system))
+  (export compile-file
+          add-linked-object
+          linking-context)
   (begin
 
     (define (read-all . args)
@@ -22,15 +26,35 @@
         (lambda (port)
           (read-all port))))
 
+    (define-record-type linker-options
+      (make-linker-options objects)
+      linker-options?
+      (objects linker-objs set-linker-objs!))
+
+    (define linker-opts (make-parameter (make-linker-options '())))
+
+    (define (add-linked-object name)
+      (set-linker-objs! (linker-opts) (cons name (linker-objs (linker-opts)))))
+
+    (define (linking-context outfile proc)
+      (parameterize ((linker-opts (make-linker-options '())))
+        (proc)
+        (sys-system (format "gcc ~a -o ~a"
+                            (string-join " " (linker-objs (linker-opts)))
+                            outfile))))
+
     (define (compile-file target filename program-or-lib)
       (define ir (map frontend (read-file filename)))
-      (write ir)
-      (newline)
-      (compile-environment (string-append filename ".s") target
+      (define asmfile (string-append filename ".s"))
+      (define objfile (string-append filename ".o"))
+      (compile-environment asmfile target
                            (lambda ()
                              (case program-or-lib
                                ((program) (codegen-main-file ir))
                                ((library) (codegen-library-file ir))
-                               (else (error "invalid argument to compile-file: " program-or-lib))))))
+                               (else (error "invalid argument to compile-file: " program-or-lib)))))
+      (sys-system (format "gcc -c ~a -o ~a" asmfile objfile))
+      (add-linked-object objfile))
+
 
     ))

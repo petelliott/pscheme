@@ -59,5 +59,4 @@ static inline pscheme_t make_pscm_fixnum(intptr_t n) {
     return n << 4 | PSCM_T_FIXNUM;
 }
 
-
 #endif
