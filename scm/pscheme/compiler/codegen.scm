@@ -115,8 +115,8 @@
       (for-each (lambda (expr)
                   (codegen-expr expr)
                   (emit 'push-builtin-arg))
-                (cddr expr))
-      (emit 'builtin builtin args)
+                args)
+      (emit 'builtin builtin (length args))
       (emit 'pop-builtin-args (length args)))
 
     ))

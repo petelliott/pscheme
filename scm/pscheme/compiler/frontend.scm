@@ -103,7 +103,7 @@
        ((is-syntax? 'define form) (error "define in expression context"))
        ((is-syntax? 'builtin form)
         `(builtin ,(cadr form)
-                  ,@ (map (lambda (form) (frontend-expr form scope)) (caddr form))))
+                  ,@ (map (lambda (form) (frontend-expr form scope)) (cddr form))))
        ((is-syntax? 'if form)
         `(if ,(frontend-expr (cadr form) scope)
              ,(frontend-expr (caddr form) scope)

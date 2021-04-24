@@ -167,16 +167,24 @@
 
 ;;; builtins
 
-    (define builtins `())
+    (define (builtin-eq? nargs)
+      (define eqt (genlabel "eqt"))
+      (unless (= nargs 2)
+        (error "builtin-eq? does not yet support nargs of" nargs))
+      (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    cmp 8(%rsp), %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
+              (singleton-literal #t) eqt (singleton-literal #f) eqt))
 
-    (define (builtin op narg)
+    (define builtins
+      `((eq? . ,builtin-eq?)))
+
+    (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))
 
     (define (push-builtin-arg)
       "    push %rax\n")
 
     (define (pop-builtin-args n)
-      (format "    add $~a, %rax\n" (* n word-size)))
+      (format "    add $~a, %rsp\n" (* n word-size)))
 
 ;;; exported architecture
 

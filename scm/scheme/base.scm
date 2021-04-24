@@ -5,4 +5,11 @@
           car
           cdr
           newline
-          write))
+          write
+          eq?)
+  (begin
+
+    (define (eq? a b)
+      (builtin eq? a b))
+
+    ))
