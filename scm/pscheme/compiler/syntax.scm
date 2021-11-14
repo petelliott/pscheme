@@ -1,7 +1,7 @@
-;;(define-library (pscheme compiler syntax)
-;;  (import (scheme base))
-;;  (export)
-;;  (begin
+(define-library (pscheme compiler syntax)
+  (import (scheme base))
+  (export apply-syntax-rules)
+  (begin
 
 (define (merge-matches . matches)
   (cond
@@ -114,8 +114,18 @@
           (apply-syntax-pattern matches (cdr form) nth-rep)))
    (else form)))
 
+;; takes the cdr of a syntax-rules
+(define (apply-syntax-rules rules form)
+  (define literals (car rules))
+  (define rulepairs (cdr rules))
+  (define (apply-inner rules)
+    (define pattern (cdaar rules))
+    (define target (cdar rules))
+    (define matches (match-syntax-pattern pattern (cdr form) literals))
+    (cond
+     (matches (apply-syntax-pattern matches target #f))
+     ((null? (cdr rules)) (error "no match for syntax-rule"))
+     (else (apply-inner (cdr rules)))))
+  (apply-inner rulepairs))
 
-
-
-
-;    ))
+))
