@@ -67,17 +67,52 @@
       (nth-match name matches nth-rep)
       (single-match name matches)))
 
-(define (apply-ellipsis-pattern matches form nth-rep)
-  )
+(define (equalize-through-error a b msg)
+  (cond
+   ((not (and a b)) (or a b))
+   ((equal? a b) a)
+   (else (error msg))))
 
-(define (apply-syntax-pattern matches form nth-rep cont)
+(define (reduce f i l)
+  (if (null? l)
+      i
+      (f (car l) (reduce f i (cdr l)))))
+
+(define (count-matches form matches)
+  (reduce + 0
+          (map
+           (lambda (m) (if (eq? form (car m)) 1 0))
+           matches)))
+
+(define (pattern-reps form matches)
+  (cond
+   ((is-ellipsis? form) #f)
+   ((and (symbol? form) (cadr (assoc form matches)))
+    (count-matches form matches))
+   ((pair? form)
+    (equalize-through-error
+     (pattern-reps (car form) matches)
+     (pattern-reps (cdr form) matches)
+     "different lengths of ellipsis match in same expansion"))
+   (else #f)))
+
+(define (apply-ellipsis-pattern matches form)
+  (map
+   (lambda (n) (apply-syntax-pattern matches form n))
+   (iota (pattern-reps form matches))))
+
+(define (apply-syntax-pattern matches form nth-rep)
   (cond
    ((null? form) '())
    ((symbol? form)
-    (general-match form matches nth-rep) form)
+    (cdr (general-match form matches nth-rep)))
    ((is-ellipsis? form)
-    (append (apply-ellipsis-pattern matches (car
-
+    (append (apply-ellipsis-pattern matches (car form))
+            (apply-syntax-pattern matches (cddr form) nth-rep)))
+   ((pair? form)
+    (cons (apply-syntax-pattern matches (car form) nth-rep)
+          (apply-syntax-pattern matches (cdr form) nth-rep)))
+   (else form)))
 
 
 
