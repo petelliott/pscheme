@@ -39,7 +39,7 @@
     (define (linking-context outfile proc)
       (parameterize ((linker-opts (make-linker-options '())))
         (proc)
-        (sys-system (format "gcc ~a -o ~a"
+        (sys-system (format "gcc -g -Og ~a -o ~a"
                             (string-join " " (linker-objs (linker-opts)))
                             outfile))))
 
@@ -53,7 +53,7 @@
                                ((program) (codegen-main-file ir))
                                ((library) (codegen-library-file ir))
                                (else (error "invalid argument to compile-file: " program-or-lib)))))
-      (sys-system (format "gcc -c ~a -o ~a" asmfile objfile))
+      (sys-system (format "gcc -g -Og -c ~a -o ~a" asmfile objfile))
       (add-linked-object objfile))
 
 

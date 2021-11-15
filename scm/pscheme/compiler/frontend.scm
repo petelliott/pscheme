@@ -3,7 +3,8 @@
           (scheme cxr)
           (pscheme compiler util)
           (pscheme compiler arch)
-          (pscheme compiler library))
+          (pscheme compiler library)
+          (pscheme compiler syntax))
   (export frontend)
   (begin
 
@@ -24,7 +25,7 @@
 
     (define (lookup-var! sym frame)
       (cond
-       ((null? frame) (lookup-global sym))
+       ((null? frame)                     (lookup-global sym))
        ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
        ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
        ((assq sym (frame-closure frame))  (assq sym (frame-closure frame)))
@@ -45,6 +46,14 @@
                  (frame-closure frame))
            (dump-frame (frame-parent frame)))))
 
+    (define (is-macro? form)
+      (and (pair? form)
+           (lookup-syntax (car form))))
+
+    ;; TODO: make macros sanitary.
+    (define (macroexpand1 form)
+      (apply-syntax-rules (lookup-syntax (car form)) form))
+
     ;;; the frontend makes all syntax explicit and figures out variable references and closures
 
     (define (frontend form)
@@ -52,8 +61,9 @@
 
     (define (frontend-toplevel form)
       (cond
+       ((is-macro? form) (frontend-toplevel (macroexpand1 form)))
        ((is-syntax? 'define-library form) (frontend-library form))
-       ((is-syntax? 'import form)         (frontend-import form))
+       ((is-syntax? 'import form) (frontend-import form))
        (else (frontend-stmt form '()))))
 
     (define (accumulate-library-decls forms imports exports begins)
@@ -83,9 +93,11 @@
 
     (define (frontend-stmt form scope)
       (cond
+       ((is-macro? form) (frontend-stmt (macroexpand1 form)))
        ((is-syntax? 'define form)
         (frontend-define form scope))
        ((is-syntax? 'begin form) `(begin ,@(map (lambda (form) (frontend-stmt form scope)) (cdr form))))
+       ((is-syntax? 'define-syntax form) (frontend-define-syntax form scope))
        (else (frontend-expr form scope))))
 
     (define (frontend-define form scope)
@@ -96,8 +108,18 @@
         (define-var! (cadr form) scope)
         `(define ,(lookup-var! (cadr form) scope) ,(frontend-expr (caddr form) scope)))))
 
+    (define (frontend-define-syntax form scope)
+      (add-library-syntax! (current-library) (cadr form) (frontend-syntax (caddr form) scope))
+      '(begin))
+
+    (define (frontend-syntax form scope)
+      (cond
+       ((is-syntax? 'syntax-rules form) (cdr form))
+       (else (error "not a valid syntax form" form))))
+
     (define (frontend-expr form scope)
       (cond
+       ((is-macro? form) (frontend-expr (macroexpand1 form)))
        ((is-syntax? 'quote form) form)
        ((is-syntax? 'begin form) `(begin ,@(map (lambda (form) (frontend-expr form scope)) (cdr form))))
        ((is-syntax? 'define form) (error "define in expression context"))

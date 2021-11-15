@@ -1,5 +1,7 @@
 (define-library (pscheme compiler syntax)
-  (import (scheme base))
+  (import (scheme base)
+          (scheme cxr)
+          (srfi 1))
   (export apply-syntax-rules)
   (begin
 
@@ -36,15 +38,11 @@
      (else #f)))
   (inner pattern form #f))
 
-;;(define-record-type no-match-type
-;;  (no-match)
-;;  no-match?)
-
 (define (single-match name matches)
   (define match (assoc name matches))
   (cond
    ((not match) #f)
-   ((car match)
+   ((cadr match)
     (error "use of ellipsis match in non-elipssis context" name))
    (else
     (cons (car match) (cddr match)))))
@@ -105,7 +103,8 @@
   (cond
    ((null? form) '())
    ((symbol? form)
-    (cdr (general-match form matches nth-rep)))
+    (let ((m (general-match form matches nth-rep)))
+      (if m (cdr m) form)))
    ((is-ellipsis? form)
     (append (apply-ellipsis-pattern matches (car form))
             (apply-syntax-pattern matches (cddr form) nth-rep)))
@@ -114,13 +113,17 @@
           (apply-syntax-pattern matches (cdr form) nth-rep)))
    (else form)))
 
+;(define (map-matches matches f)
+;  (map (lambda (m) (cons (car m) (cons (cadr m) (f (cddr m)))))
+;       matches))
+
 ;; takes the cdr of a syntax-rules
 (define (apply-syntax-rules rules form)
   (define literals (car rules))
   (define rulepairs (cdr rules))
   (define (apply-inner rules)
     (define pattern (cdaar rules))
-    (define target (cdar rules))
+    (define target (cadar rules))
     (define matches (match-syntax-pattern pattern (cdr form) literals))
     (cond
      (matches (apply-syntax-pattern matches target #f))
