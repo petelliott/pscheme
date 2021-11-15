@@ -1,6 +1,6 @@
 (define-library (scheme base)
   (export * + - <=
-          cons car cdr pair? null?
+          cons car cdr caar cadr cdar cddr pair? null?
           newline
           write
           eq?
@@ -15,6 +15,18 @@
     ;;; 6.4: Pairs and lists
 
     ;; written in C: cons, car, cdr, pair?
+
+    (define (caar p)
+      (car (car p)))
+
+    (define (cadr p)
+      (car (cdr p)))
+
+    (define (cdar p)
+      (cdr (car p)))
+
+    (define (cddr p)
+      (cdr (cdr p)))
 
     (define (null? obj)
       (eq? obj '()))
