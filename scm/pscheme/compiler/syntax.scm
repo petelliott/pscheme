@@ -85,7 +85,7 @@
 (define (pattern-reps form matches)
   (cond
    ((is-ellipsis? form) #f)
-   ((and (symbol? form) (cadr (assoc form matches)))
+   ((and (symbol? form) (cadr (or (assoc form matches) '(#f ()) )))
     (count-matches form matches))
    ((pair? form)
     (equalize-through-error
@@ -97,7 +97,7 @@
 (define (apply-ellipsis-pattern matches form)
   (map
    (lambda (n) (apply-syntax-pattern matches form n))
-   (iota (pattern-reps form matches))))
+   (iota (or (pattern-reps form matches) 0))))
 
 (define (apply-syntax-pattern matches form nth-rep)
   (cond

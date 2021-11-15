@@ -93,7 +93,7 @@
 
     (define (frontend-stmt form scope)
       (cond
-       ((is-macro? form) (frontend-stmt (macroexpand1 form)))
+       ((is-macro? form) (frontend-stmt (macroexpand1 form) scope))
        ((is-syntax? 'define form)
         (frontend-define form scope))
        ((is-syntax? 'begin form) `(begin ,@(map (lambda (form) (frontend-stmt form scope)) (cdr form))))
@@ -119,7 +119,7 @@
 
     (define (frontend-expr form scope)
       (cond
-       ((is-macro? form) (frontend-expr (macroexpand1 form)))
+       ((is-macro? form) (frontend-expr (macroexpand1 form) scope))
        ((is-syntax? 'quote form) form)
        ((is-syntax? 'begin form) `(begin ,@(map (lambda (form) (frontend-expr form scope)) (cdr form))))
        ((is-syntax? 'define form) (error "define in expression context"))
