@@ -9,6 +9,8 @@ enum pscheme_tags {
     PSCM_T_FIXNUM = 0,
     PSCM_T_CONS,
     PSCM_T_SINGLETON,
+    PSCM_T_STRING,
+    PSCM_T_CHAR
 };
 
 typedef uintptr_t pscheme_t;

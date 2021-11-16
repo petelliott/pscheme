@@ -77,6 +77,7 @@
           (enter-block-environment
            (lambda () (emit 'cons-literal label left right)))
           (emit-eval 'tag-cons-label label)))
+       ((char? literal) (emit-eval 'char-literal literal))
        (else (error "can't generate code for literal: " literal))))
 
     (define (codegen-literal literal)

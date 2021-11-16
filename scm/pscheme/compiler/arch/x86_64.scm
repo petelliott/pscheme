@@ -43,7 +43,9 @@
     (enum tags
           PSCM-T-FIXNUM
           PSCM-T-CONS
-          PSCM-T-SINGLETON)
+          PSCM-T-SINGLETON
+          PSCM-T-STRING
+          PSCM-T-CHAR)
 
     (enum singletons
           PSCM-S-NIL
@@ -115,6 +117,9 @@
 ;;; literal representations
     (define (fixnum-literal value)
       (format "~a" (tag-number value PSCM-T-FIXNUM)))
+
+    (define (char-literal value)
+      (format "~a" (tag-number (char->integer value) PSCM-T-CHAR)))
 
     (define (singleton-literal value)
       (format "~a"
@@ -211,6 +216,7 @@
         (c-epilogue . ,c-epilogue)
         (c-call . ,c-call)
         (fixnum-literal . ,fixnum-literal)
+        (char-literal . ,char-literal)
         (singleton-literal . ,singleton-literal)
         (cons-literal . ,cons-literal)
         (tag-cons-label . ,tag-cons-label)

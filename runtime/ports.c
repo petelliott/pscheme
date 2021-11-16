@@ -34,6 +34,8 @@ static void pscheme_write(pscheme_t obj) {
         } else if (unum(obj) == PSCM_S_UNBOUND) {
             printf("#<unbound>");
         }
+    } else if (tag(obj) == PSCM_T_CHAR) {
+        printf("#\\%c", (char)num(obj));
     } else {
         printf("#<?>");
     }
