@@ -131,8 +131,15 @@
     (define (cons-literal label left right)
       (format "    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label left right))
 
-    (define (tag-cons-label label)
-      (format "(~a + ~a)" label PSCM-T-CONS))
+    (define (string-literal label value)
+      (format "    .data\n    .align 16\n~a:\t.asciz ~s\n" label value))
+
+    (define (tag-label label tag)
+      (format "(~a + ~a)" label
+              (case tag
+                ((pair) PSCM-T-CONS)
+                ((string) PSCM-T-STRING))))
+
 
     (define (load-immediate-literal literal)
       (format "    mov $~a, %rax\n" literal))
@@ -219,7 +226,8 @@
         (char-literal . ,char-literal)
         (singleton-literal . ,singleton-literal)
         (cons-literal . ,cons-literal)
-        (tag-cons-label . ,tag-cons-label)
+        (string-literal . ,string-literal)
+        (tag-label . ,tag-label)
         (load-immediate-literal . ,load-immediate-literal)
         (load-data-literal . ,load-data-literal)
         (builtin . ,builtin)

@@ -36,6 +36,8 @@ static void pscheme_write(pscheme_t obj) {
         }
     } else if (tag(obj) == PSCM_T_CHAR) {
         printf("#\\%c", (char)num(obj));
+    } else if (tag(obj) == PSCM_T_STRING) {
+        printf("\"%s\"", (char *)ptr(obj));
     } else {
         printf("#<?>");
     }

@@ -76,8 +76,13 @@
               (label (genlabel "pscm_cons")))
           (enter-block-environment
            (lambda () (emit 'cons-literal label left right)))
-          (emit-eval 'tag-cons-label label)))
+          (emit-eval 'tag-label label 'pair)))
        ((char? literal) (emit-eval 'char-literal literal))
+       ((string? literal)
+        (let ((label (genlabel "pscm_string")))
+          (enter-block-environment
+           (lambda () (emit 'string-literal label literal)))
+          (emit-eval 'tag-label label 'string)))
        (else (error "can't generate code for literal: " literal))))
 
     (define (codegen-literal literal)
