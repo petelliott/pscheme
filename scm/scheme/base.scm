@@ -2,7 +2,7 @@
   (export eq?
           number? integer? * + - <=
           not boolean?
-          pair? null? cons car cdr caar cadr cdar cddr
+          pair? cons car cdr caar cadr cdar cddr null? list? make-list list length append reverse
           newline
           write
           cond case and or when unless let let* letrec letrec*
@@ -189,9 +189,6 @@
     (define (pair? obj)
       (builtin pair? obj))
 
-    (define (null? obj)
-      (eq? obj '()))
-
     (define (caar p)
       (car (car p)))
 
@@ -203,6 +200,41 @@
 
     (define (cddr p)
       (cdr (cdr p)))
+
+    (define (null? obj)
+      (eq? obj '()))
+
+    ;; closues are required for this
+    #;(define (list? obj)
+      (or (null? obj)
+          (and (pair? obj)
+    (list? (cdr obj)))))
+
+    #;(define (make-list n . fill)
+      (if (eq? n 0)
+          '()
+    (cons fill (make-list (- n 1) fill))))
+
+    (define (list . rest)
+      rest)
+
+    (define (length obj)
+      (if (null? obj)
+          0
+          (+ 1 (length (cdr obj)))))
+
+    (define (append a b)
+      (if (null? a)
+          b
+          (cons (car a) (append (cdr a) b))))
+
+    (define (reverse-inner lst onto)
+      (if (null? lst)
+          onto
+          (reverse-inner (cdr lst) (cons (car lst) onto))))
+
+    (define (reverse lst)
+      (reverse-inner lst '()))
 
     ;; 6.6: Characters
 
