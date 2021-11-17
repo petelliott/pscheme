@@ -1,39 +1,19 @@
 (define-library (scheme base)
-  (export * + - <=
-          cons car cdr caar cadr cdar cddr pair? null?
+  (export eq?
+          number? integer? * + - <=
+          not boolean?
+          pair? null? cons car cdr caar cadr cdar cddr
           newline
           write
-          eq?
-          cond case and or when unless let let* letrec letrec*)
+          cond case and or when unless let let* letrec letrec*
+          char?
+          string?)
   (begin
-
-    ;;; 6.1: Equivalence predicates
-
-    (define (eq? a b)
-      (builtin eq? a b))
-
-    ;;; 6.4: Pairs and lists
-
-    ;; written in C: cons, car, cdr, pair?
-
-    (define (caar p)
-      (car (car p)))
-
-    (define (cadr p)
-      (car (cdr p)))
-
-    (define (cdar p)
-      (cdr (car p)))
-
-    (define (cddr p)
-      (cdr (cdr p)))
-
-    (define (null? obj)
-      (eq? obj '()))
-
     ;;; 7.3: Derived expression types
 
     ;; all of these are copied verbaitm from the r7rs spec
+
+    ;; these are first, because they are used in later functions
 
     (define-syntax cond
       (syntax-rules (else =>)
@@ -179,5 +159,59 @@
            ...
            (let () body1 body2 ...)))))
 
+    ;;; 6.1: Equivalence predicates
+
+    (define (eq? a b)
+      (builtin eq? a b))
+
+    ;;; 6.2: Numbers
+
+    (define (number? obj)
+      (or (integer? obj)))
+
+    (define (integer? obj)
+      (or (builtin fixnum? obj)))
+
+    ;;; 6.3: Booleans
+
+    (define (not b)
+      (if b #f #t))
+
+    ;; closues are required for this
+    #;(define (boolean? obj)
+      (or (eq? obj #f)
+          (eq? obj #t)))
+
+    ;;; 6.4: Pairs and lists
+
+    ;; written in C: cons, car, cdr.
+
+    (define (pair? obj)
+      (builtin pair? obj))
+
+    (define (null? obj)
+      (eq? obj '()))
+
+    (define (caar p)
+      (car (car p)))
+
+    (define (cadr p)
+      (car (cdr p)))
+
+    (define (cdar p)
+      (cdr (car p)))
+
+    (define (cddr p)
+      (cdr (cdr p)))
+
+    ;; 6.6: Characters
+
+    (define (char? obj)
+      (builtin char? obj))
+
+    ;; 6.7: Strings
+
+    (define (string? obj)
+      (builtin string? obj))
 
     ))

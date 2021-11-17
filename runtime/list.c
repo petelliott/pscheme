@@ -20,9 +20,3 @@ pscheme_fn(scheme$$base$$cdr) {
     assert(pscheme_nargs() == 1);
     pscheme_return(pscheme_cdr(pscheme_arg(0)));
 }
-
-pscheme_fn(scheme$$base$$pair$3f$) {
-    pscheme_start();
-    assert(pscheme_nargs() == 1);
-    pscheme_return(make_pscm_bool(tag(pscheme_arg(0)) == PSCM_T_CONS));
-}

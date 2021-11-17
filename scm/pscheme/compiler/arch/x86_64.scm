@@ -13,7 +13,7 @@
     ;; result register:     %rax (caller saved)
     ;; frame pointer:       %rbp (callee saved)
     ;; argument pointer:    %rdi (caller and callee saved)
-    ;; temporary registers: %r11 (caller saved)
+    ;; temporary registers: %r11 (caller saved) (IGNORE FOR NOW)
 
     (define (x86-arg ref)
       (cond
@@ -106,7 +106,7 @@
     (define (global-define-slot lib sym)
       (define label (mangle lib sym))
       ;; TODO: replace 0 with undefined constant
-      (format "    .data\n    .global ~a\n    .align 8\n~a:\t.8byte 0\n" label label))
+      (format "\n    .data\n    .global ~a\n    .align 8\n~a:\t.8byte 0\n" label label))
 
     (define (load-lambda label)
       (format "    lea ~a(%rip), %rax\n" label))
@@ -129,10 +129,10 @@
                               ((#t) PSCM-S-T)) PSCM-T-SINGLETON)))
 
     (define (cons-literal label left right)
-      (format "    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label left right))
+      (format "\n    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label left right))
 
     (define (string-literal label value)
-      (format "    .data\n    .align 16\n~a:\t.asciz ~s\n" label value))
+      (format "\n    .data\n    .align 16\n~a:\t.asciz ~s\n" label value))
 
     (define (tag-label label tag)
       (format "(~a + ~a)" label
@@ -186,8 +186,43 @@
       (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    cmp 8(%rsp), %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
               (singleton-literal #t) eqt (singleton-literal #f) eqt))
 
+    (define (builtin-typep nargs tag)
+      (define label (genlabel "typep"))
+      (unless (= nargs 1)
+        (error "builtin-typep nargs =" nargs))
+      (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    and $0xf, %rcx\n    cmp $~a, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
+              (singleton-literal #t) tag label (singleton-literal #f) label))
+
+    (define (builtin-ptr->ffi nargs)
+      (unless (= nargs 1)
+        (error "builtin-ptr->ffi nargs =" nargs))
+      (format "    mov (%rsp), %rax\n    shr $4, %rax\n    shl $4, %rax"))
+
+    (define (builtin-num->ffi nargs)
+      (unless (= nargs 1)
+        (error "builtin-num->ffi nargs =" nargs))
+      (format "    mov (%rsp), %rax\n    shr $4, %rax"))
+
+    #;(define (builtin-ffi-call nargs)
+      (define regs '("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
+      (define (ffi-regarg i)
+        (when (>= i 6)
+          (error "can't pass nth arg in register:" i))
+        (format "    mov ~a(%rsp), ~a\n" (- (* word-size (- nargs i 1))) (list-ref regs i)))
+      (define (ffi-pushargs)
+        (reduce string-append "" (map ffi-regarg (iota nargs))))
+      (format "    push %rdi\n~a\n    "
+              (ffi-pushargs)))
+
     (define builtins
-      `((eq? . ,builtin-eq?)))
+      `((eq? . ,builtin-eq?)
+        (fixnum? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-FIXNUM)))
+        (pair? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-CONS)))
+        (string? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-STRING)))
+        (char? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-CHAR)))
+        (fixnum->ffi . ,builtin-num->ffi)
+        (string->ffi . ,builtin-ptr->ffi)
+        (char->ffi . ,builtin-ptr->ffi)))
 
     (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))
