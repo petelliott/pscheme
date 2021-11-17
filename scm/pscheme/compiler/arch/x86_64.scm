@@ -19,7 +19,7 @@
       (cond
        ((eq? ref 'result) "%rax")
        ((is-syntax? 'stack ref)
-        (format "~a(%ebp)" (* (cdr ref) word-size)))
+        (format "~a(%rbp)" (- (* (+ (cadr ref) 1) word-size))))
        #;((is-syntax? 'temp ref)
           (format "~a(%esp)" (- (* (cdr ref) word-size))))
        ((is-syntax? 'arg ref)
