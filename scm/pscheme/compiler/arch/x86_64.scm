@@ -94,7 +94,6 @@
 ;;; complex syntax operations
 
     (define (if-prologue key)
-      ;; TODO: replace $0 with false value
       (format "    cmp $~a, %rax\n    je _if_false_~a\n" (tag-number PSCM-S-F PSCM-T-SINGLETON) key))
 
     (define (if-middle key)
@@ -150,6 +149,10 @@
 ;;; pscheme calling convention
     (define (prologue label)
       (format "\n    .text\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label))
+
+    (define (accumulate-rest nregular ref)
+      (format "    mov $~a, %rsi\n    call pscm_internal_rest\n    mov %rax, ~a\n"
+              nregular (x86-arg ref)))
 
     (define (epilogue)
       ;"    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
@@ -250,6 +253,7 @@
         (global-define-slot . ,global-define-slot)
         (load-lambda . ,load-lambda)
         (prologue . ,prologue)
+        (accumulate-rest . ,accumulate-rest)
         (epilogue . ,epilogue)
         (prepare . ,prepare)
         (pusharg . ,pusharg)

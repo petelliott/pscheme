@@ -40,6 +40,8 @@
        ((push-locals)
         (when (> (cadr stmt) 0)
           (emit 'stack-alloc (cadr stmt))))
+       ((accumulate-rest)
+        (emit 'accumulate-rest (cadr stmt) (caddr stmt)))
        ((begin) (for-each codegen-stmt (cdr stmt)))
        (else (codegen-expr stmt))))
 

@@ -9,15 +9,16 @@
   (begin
 
     (define-record-type frame
-      (make-frame args locals closure parent)
+      (make-frame args rest-arg locals closure parent)
       frame?
       (args frame-args)
+      (rest-arg frame-rest-arg set-frame-rest-arg!)
       (locals frame-locals set-frame-locals!)
       (closure frame-closure set-frame-closure!)
       (parent frame-parent))
 
-    (define (new-frame args parent)
-      (make-frame args '() '() parent))
+    (define (new-frame args rest-arg parent)
+      (make-frame args rest-arg '() '() parent))
 
     (define (define-var! sym frame)
       (if (not (null? frame))
@@ -26,6 +27,7 @@
     (define (lookup-var! sym frame)
       (cond
        ((null? frame)                     (lookup-global sym))
+       ((eq? sym (frame-rest-arg frame))  `(stack ,(length (frame-locals frame))))
        ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
        ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
        ((assq sym (frame-closure frame))  (assq sym (frame-closure frame)))
@@ -42,6 +44,7 @@
           '()
           (cons
            (list (frame-args frame)
+                 (frame-rest-arg frame)
                  (frame-locals frame)
                  (frame-closure frame))
            (dump-frame (frame-parent frame)))))
@@ -137,12 +140,29 @@
        ((symbol? form) `(ref ,(lookup-var! form scope)))
        (else `(quote ,form))))
 
+    (define (rest-arg arg-list)
+      (cond
+       ((symbol? arg-list) arg-list)
+       ((null? arg-list) #f)
+       ((pair? arg-list) (rest-arg (cdr arg-list)))
+       (else (error "malform argument list" arg-list))))
+
+    (define (regular-args arg-list onto)
+      (if (or (null? arg-list)
+              (symbol? arg-list))
+          onto
+          (regular-args (cdr arg-list) (cons (car arg-list) onto))))
+
     (define (frontend-lambda form scope)
-      (define new-scope (new-frame (reverse (cadr form)) scope))
+      (define new-scope (new-frame (regular-args (cadr form) '()) (rest-arg (cadr form)) scope))
       (define body (map (lambda (form) (frontend-stmt form new-scope)) (cddr form)))
+      (define nlocals (length (frame-locals new-scope)))
       `(closure
         (lambda ,(cadr form)
-          (push-locals ,(length (frame-locals new-scope)))
+          ,@(if (frame-rest-arg new-scope)
+               `((accumulate-rest ,(length (frame-args new-scope)) (stack ,nlocals))
+                 (push-locals ,(+ nlocals 1)))
+               `((push-locals ,nlocals)))
           ,@body)
         ,@(reverse (frame-closure new-scope))))
 
