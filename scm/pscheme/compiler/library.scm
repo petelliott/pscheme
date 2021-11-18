@@ -1,7 +1,7 @@
 (define-library (pscheme compiler library)
   (import (scheme base)
           (scheme file)
-          (pscheme functional)
+          (srfi 1)
           (pscheme compiler compile)
           (pscheme compiler arch)
           (pscheme string))
