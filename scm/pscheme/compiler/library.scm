@@ -3,7 +3,7 @@
           (scheme file)
           (pscheme functional)
           (pscheme compiler compile)
-          (pscheme compiler arch x86_64)
+          (pscheme compiler arch)
           (pscheme string))
   (export library?
           library-name
@@ -61,8 +61,7 @@
 
     (define (compile-and-import name)
       (or (lookup-library name)
-          ;; TODO: set arch dynamically
-          (compile-file x86_64 (library-filename name) 'library))
+          (compile-file (current-target) (library-filename name) 'library))
       (add-library-import! (current-library) (lookup-library name)))
 
     (define (find-library name curr-lib)

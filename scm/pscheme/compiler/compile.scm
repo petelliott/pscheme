@@ -44,11 +44,11 @@
                             outfile))))
 
     (define (compile-file target filename program-or-lib)
-      (define ir (map frontend (read-file filename)))
       (define asmfile (string-append filename ".s"))
       (define objfile (string-append filename ".o"))
       (compile-environment asmfile target
                            (lambda ()
+                             (define ir (map frontend (read-file filename)))
                              (case program-or-lib
                                ((program) (codegen-main-file ir))
                                ((library) (codegen-library-file ir))
