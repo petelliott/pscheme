@@ -1,19 +1,27 @@
 (import (scheme base)
-        (scheme cxr)
-        (scheme load)
-        (scheme read)
-        (scheme write)
-        (scheme process-context))
+        (scheme process-context)
+        (srfi 1))
 
-(import (pscheme compiler arch x86_64)
+(import (pscheme base)
+        (pscheme compiler arch x86_64)
         (pscheme compiler compile)
         (pscheme compiler library))
 
-;; TODO: install this or something
-(add-to-load-path ".")
-(add-to-load-path "/home/peter/code/scheme/pscheme/scm")
+(define opts (getopt (command-line)
+                     '((include #\I #t)
+                       (lib #\L #t)
+                       (output #\o #t)
+                       (arch #\a #t)))) ; TODO: support arch flag
 
-(linking-context "a.out"
-                 (lambda ()
-                   (add-linked-object "/home/peter/code/scheme/pscheme/runtime/runtime.a")
-                   (compile-file x86_64 (cadr (command-line)) 'program)))
+(add-to-load-path ".")
+(for-each add-to-load-path
+          (map cdr (filter (lambda (m) (eq? (car m) 'include))
+                           opts)))
+
+(define libs
+  (map cdr (filter (lambda (m) (eq? (car m) 'lib))
+                   opts)))
+
+(compile-project x86_64 (cadr (assoc 'rest opts))
+                 (cdr (or (assoc 'output opts) '(output . "a.out")))
+                 libs)

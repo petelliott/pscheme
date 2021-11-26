@@ -10,7 +10,8 @@
           (pscheme compiler frontend)
           (pscheme compiler codegen)
           (only (gauche base) sys-system))
-  (export compile-file
+  (export compile-project
+          compile-file
           add-linked-object
           linking-context)
   (begin
@@ -56,5 +57,10 @@
       (sys-system (format "gcc -g -Og -c ~a -o ~a" asmfile objfile))
       (add-linked-object objfile))
 
+    (define (compile-project target filename outfile linked-libs)
+      (linking-context outfile
+                       (lambda ()
+                         (for-each (lambda (lib) (add-linked-object lib)) linked-libs)
+                         (compile-file target filename 'program))))
 
     ))
