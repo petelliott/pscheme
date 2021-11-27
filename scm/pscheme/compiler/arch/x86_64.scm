@@ -67,32 +67,11 @@
 
 ;;; general purpose operations:
 
-    (define (add a b)
-      ;; TODO: elide mov if one argument is result
-      (format "    mov ~a, %rax\n    add ~a, %rax\n"
-              (x86-arg a)
-              (x86-arg b)))
-
-    (define (sub a b)
-      ;; TODO: elide mov if a is result
-      (format "    mov ~a, %rax\n    sub ~a, %rax\n"
-              (x86-arg a)
-              (x86-arg b)))
-
     (define (mov src dest)
       (format "    movq ~a, ~a\n" (x86-arg src) (x86-arg dest)))
 
     (define (stack-alloc n)
       (format "    sub $~a, %rsp\n" (* word-size n)))
-
-    (define (stack-free n)
-      (format "    add $~a, %rsp\n" (* word-size n)))
-
-    (define (push value)
-      (format "    pushq ~a\n" (x86-arg value)))
-
-    (define (pop)
-      "    popq %rax\n")
 
 ;;; complex syntax operations
 
@@ -257,13 +236,8 @@
 ;;; exported architecture
 
     (define x86_64
-      `((add . ,add)
-        (sub . ,sub)
-        (mov . ,mov)
+      `((mov . ,mov)
         (stack-alloc . ,stack-alloc)
-        (stack-free . ,stack-free)
-        (push . ,push)
-        (pop . ,pop)
         (if-prologue . ,if-prologue)
         (if-middle . ,if-middle)
         (if-prologue . ,if-prologue)
