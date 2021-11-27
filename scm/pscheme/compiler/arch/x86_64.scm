@@ -1,7 +1,8 @@
 (define-library (pscheme compiler arch x86_64)
   (import (scheme base)
           (scheme cxr)
-          (srfi-28)
+          (srfi 28)
+          (srfi 1)
           (pscheme compiler util)
           (pscheme compiler arch))
   (export x86_64)
@@ -13,15 +14,17 @@
     ;; result register:     %rax (caller saved)
     ;; frame pointer:       %rbp (callee saved)
     ;; argument pointer:    %rdi (caller and callee saved)
-    ;; temporary registers: %r11 (caller saved) (IGNORE FOR NOW)
+    ;; closure registers:   %rbx (callee saved)
+
+    ;; temprorary registers: %rcx, %r12
 
     (define (x86-arg ref)
       (cond
        ((eq? ref 'result) "%rax")
        ((is-syntax? 'stack ref)
         (format "~a(%rbp)" (- (* (+ (cadr ref) 1) word-size))))
-       #;((is-syntax? 'temp ref)
-          (format "~a(%esp)" (- (* (cdr ref) word-size))))
+       ((is-syntax? 'closure ref)
+        (format "~a(%rbx)" (* (+ (cadr ref) 1) word-size)))
        ((is-syntax? 'arg ref)
         (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
        ((is-syntax? 'global ref)
@@ -144,11 +147,20 @@
       (format "    mov $~a, %rax\n" literal))
 
     (define (load-data-literal literal)
-      (format  "    lea ~a(%rip), %rax\n" literal))
+      (format "    lea ~a(%rip), %rax\n" literal))
+
+;;; closures
+    (define (enclose args)
+      (format "    mov %rax, %r12\n    push %rdi\n    mov $~a, %rdi\n    call pscheme_allocate_block\n    pop %rdi\n    mov %r12, 0(%rax)\n~a"
+              (+ 1 (* word-size (length args)))
+              (apply string-append
+                     (map (lambda (arg i)
+                            (format "    mov ~a, %rcx\n    mov %rcx, ~a(%rax)\n" (x86-arg arg) (* (+ i 1) word-size)))
+                          args (iota (length args))))))
 
 ;;; pscheme calling convention
     (define (prologue label)
-      (format "\n    .text\n~a:\n    push %rbp\n    mov %rsp, %rbp\n" label))
+      (format "\n    .text\n~a:\n    push %rbx\n    mov 8(%rdi), %rbx\n    push %rbp\n    mov %rsp, %rbp\n" label))
 
     (define (accumulate-rest nregular ref)
       (format "    mov $~a, %rsi\n    call pscm_internal_rest\n    mov %rax, ~a\n"
@@ -156,7 +168,7 @@
 
     (define (epilogue)
       ;"    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
-      "    mov %rbp, %rsp\n    pop %rbp\n    ret\n")
+      "    mov %rbp, %rsp\n    pop %rbp\n    pop %rbx\n    ret\n")
 
     (define (prepare)
       "    push %rax\n    push %rdi\n")
@@ -166,6 +178,12 @@
 
     (define (call nargs)
       (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
+              (* word-size nargs)
+              (* word-size (+ nargs 1))))
+
+    ;; like call but with the double indirection for the closure
+    (define (call-closure nargs)
+      (format "    lea ~a(%rsp), %rdi\n    mov ~a(%rsp), %rax\n    call *(%rax)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
               (* word-size nargs)
               (* word-size (+ nargs 1))))
 
@@ -252,12 +270,14 @@
         (if-end . ,if-end)
         (global-define-slot . ,global-define-slot)
         (load-lambda . ,load-lambda)
+        (enclose . ,enclose)
         (prologue . ,prologue)
         (accumulate-rest . ,accumulate-rest)
         (epilogue . ,epilogue)
         (prepare . ,prepare)
         (pusharg . ,pusharg)
         (call . ,call)
+        (call-closure . ,call-closure)
         (c-prologue . ,c-prologue)
         (c-epilogue . ,c-epilogue)
         (c-call . ,c-call)
