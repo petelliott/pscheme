@@ -177,8 +177,7 @@
     (define (not b)
       (if b #f #t))
 
-    ;; closues are required for this
-    #;(define (boolean? obj)
+    (define (boolean? obj)
       (or (eq? obj #f)
           (eq? obj #t)))
 
@@ -204,11 +203,10 @@
     (define (null? obj)
       (eq? obj '()))
 
-    ;; closues are required for this
-    #;(define (list? obj)
+    (define (list? obj)
       (or (null? obj)
           (and (pair? obj)
-    (list? (cdr obj)))))
+               (list? (cdr obj)))))
 
     #;(define (make-list n . fill)
       (if (eq? n 0)
