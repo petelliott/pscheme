@@ -168,7 +168,8 @@
 
 ;;; pscheme calling convention
     (define (prologue label)
-      (format "\n    .text\n~a:\n    push %rbx\n    mov 8(%rdi), %rbx\n    push %rbp\n    mov %rsp, %rbp\n" label))
+      (format "\n    .text\n~a:\n    push %rbx\n    mov 8(%rdi), %rbx\n    shr $4, %rbx\n    shl $4, %rbx\n    push %rbp\n    mov %rsp, %rbp\n"
+              label))
 
     (define (accumulate-rest nregular ref)
       (format "    mov $~a, %rsi\n    call pscm_internal_rest\n    mov %rax, ~a\n"

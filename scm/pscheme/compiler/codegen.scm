@@ -33,15 +33,23 @@
          (emit 'c-epilogue)))
       'unspecified)
 
+    (define (codegen-block f subexprs)
+      (if (null? subexprs)
+          'unspecified
+          (let* ((reversed (reverse subexprs))
+                 (last (car reversed))
+                 (notlast (reverse (cdr reversed))))
+            (for-each f notlast)
+            (f last))))
+
     (define (codegen-stmt stmt)
       (case (car stmt)
-       ((define) (codegen-define stmt))
-       ((import) (codegen-import stmt))
-       ((push-locals) (codegen-push-locals stmt))
-       ((accumulate-rest) (codegen-accumulate-rest stmt))
-       ((begin) (for-each codegen-stmt (cdr stmt)))
-       (else (codegen-expr stmt))))
-
+        ((define) (codegen-define stmt))
+        ((import) (codegen-import stmt))
+        ((push-locals) (codegen-push-locals stmt))
+        ((accumulate-rest) (codegen-accumulate-rest stmt))
+        ((begin) (codegen-block codegen-stmt (cdr stmt)))
+        (else (codegen-expr stmt))))
 
     (define (codegen-define stmt)
       (when (is-syntax? 'global (cadr stmt))
@@ -72,7 +80,7 @@
         ((call)    (codegen-call expr))
         ((if)      (codegen-if expr))
         ((closure) (codegen-closure expr))
-        ((begin)   (for-each codegen-expr (cdr expr)))
+        ((begin)   (codegen-block codegen-expr (cdr expr)))
         ((builtin) (codegen-builtin (cadr expr) (cddr expr)))
         (else (error "unsuported expression " expr))))
 
@@ -106,11 +114,7 @@
       (enter-block-environment
        (lambda ()
          (emit 'prologue label)
-         (let* ((r (reverse (cddr expr)))
-                (last (car r))
-                (rest (reverse (cdr r))))
-           (for-each codegen-stmt rest)
-           (emit 'mov (codegen-stmt last) 'result))
+         (emit 'mov (codegen-block codegen-stmt (cddr expr)) 'result)
          (emit 'epilogue)))
       `(data ,label))
 
