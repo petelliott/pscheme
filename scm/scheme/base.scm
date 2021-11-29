@@ -7,7 +7,8 @@
           write
           cond case and or when unless let let* letrec letrec*
           char?
-          string?)
+          string?
+          procedure?)
   (begin
     ;;; 7.3: Derived expression types
 
@@ -243,5 +244,12 @@
 
     (define (string? obj)
       (builtin string? obj))
+
+    ;; 6.8: Vectors
+    ;; 6.9: Byte Vectors
+    ;; 6.10: Control features
+
+    (define (procedure? obj)
+      (builtin procedure? obj))
 
     ))

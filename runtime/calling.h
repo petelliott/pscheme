@@ -20,6 +20,7 @@
 
 #define pscheme_fn(name)                                                \
     static pscheme_t name(pscheme_t *_pscheme_args);                    \
+    __attribute__((aligned(16)))                                        \
     pscheme_t (*_wrapper_##name)(pscheme_t *_pscheme_args) = name;      \
     pscheme_t (**pscm_sym_##name)(pscheme_t *_pscheme_args) = &_wrapper_##name; \
     static pscheme_t name(pscheme_t *_pscheme_args)

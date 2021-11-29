@@ -68,7 +68,8 @@
           PSCM-T-CONS
           PSCM-T-SINGLETON
           PSCM-T-STRING
-          PSCM-T-CHAR)
+          PSCM-T-CHAR
+          PSCM-T-CLOSURE)
 
     (enum singletons
           PSCM-S-NIL
@@ -156,13 +157,14 @@
 
 ;;; closures
     (define (enclose l args)
-      (format "~a    push %rdi\n    mov $~a, %rdi\n    call pscheme_allocate_block\n    pop %rdi\n    mov %r12, 0(%rax)\n~a"
+      (format "~a    push %rdi\n    mov $~a, %rdi\n    call pscheme_allocate_block\n    pop %rdi\n    mov %r12, 0(%rax)\n~a    or $~a, %rax\n"
               (mov l "%r12")
               (+ 1 (* word-size (length args)))
               (apply string-append
                      (map (lambda (arg i)
                             (format "    mov ~a, %rcx\n    mov %rcx, ~a(%rax)\n" (x86-arg arg) (* (+ i 1) word-size)))
-                          args (iota (length args))))))
+                          args (iota (length args))))
+              PSCM-T-CLOSURE))
 
 ;;; pscheme calling convention
     (define (prologue label)
@@ -193,7 +195,7 @@
 
     ;; like call but with the double indirection for the closure
     (define (call-closure nargs)
-      (format "    lea ~a(%rsp), %rdi\n    mov ~a(%rsp), %rax\n    call *(%rax)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
+      (format "    lea ~a(%rsp), %rdi\n    mov ~a(%rsp), %rax\n    shr $4, %rax\n    shl $4, %rax\n    call *(%rax)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
               (* word-size nargs)
               (* word-size (+ nargs 1))))
 
@@ -257,6 +259,7 @@
         (pair? . ,(lambda (args) (builtin-typep args PSCM-T-CONS)))
         (string? . ,(lambda (args) (builtin-typep args PSCM-T-STRING)))
         (char? . ,(lambda (args) (builtin-typep args PSCM-T-CHAR)))
+        (procedure? . ,(lambda (args) (builtin-typep args PSCM-T-CLOSURE)))
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
         (char->ffi . ,builtin-ptr->ffi)))
