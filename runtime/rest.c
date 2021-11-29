@@ -6,7 +6,7 @@
 pscheme_t pscm_internal_rest(pscheme_t *_pscheme_args, size_t normal_args) {
     pscheme_start();
 
-    size_t nargs = pscheme_nargs() - 2;
+    size_t nargs = pscheme_nargs() - 3;
     assert(nargs >= normal_args);
 
     pscheme_t list = PSCM_NIL;

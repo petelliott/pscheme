@@ -9,8 +9,6 @@
     size_t     _pscheme_nargs;                                          \
     asm volatile ("mov %%rbp, %0" : "=r" (_pscheme_nargs));             \
     _pscheme_nargs = (((uintptr_t) _pscheme_args) - _pscheme_nargs)/sizeof(pscheme_t) - 2;
-// TODO: get the closure
-
 
 #define pscheme_nargs() (_pscheme_nargs)
 #define pscheme_arg(n) (_pscheme_args[-n-1])
