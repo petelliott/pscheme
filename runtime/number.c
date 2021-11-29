@@ -22,8 +22,8 @@ pscheme_fn(scheme$$base$$$2b$) {
     pscheme_return(make_pscm_fixnum(acc));
 }
 
-// $2d$ = -
-pscheme_fn(scheme$$base$$$2d$) {
+// _ = -
+pscheme_fn(scheme$$base$$_) {
     pscheme_start();
     assert(pscheme_nargs() >= 1);
     if (pscheme_nargs() == 1) {
