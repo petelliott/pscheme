@@ -1,8 +1,8 @@
 (define-library (pscheme compiler arch x86_64)
   (import (scheme base)
           (scheme cxr)
-          (srfi 28)
           (srfi 1)
+          (srfi 28)
           (pscheme compiler util)
           (pscheme compiler arch))
   (export x86_64)
@@ -29,7 +29,25 @@
         (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
        ((is-syntax? 'global ref)
         (format "~a(%rip)" (mangle (cadr ref) (caddr ref))))
+       ((is-syntax? 'immediate ref)
+        (format "$~a" (cadr ref)))
+       ((eq? ref 'unspecified)
+        (format "$~a" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON)))
+       ((string? ref) ref)
        (else (error "unsupported reference format " ref))))
+
+    (define (x86-data ref)
+      (cadr ref))
+
+    (define (x86-arg-lea-safe ref)
+      (if (is-syntax? 'data ref)
+          (x86-arg 'result)
+          (x86-arg ref)))
+
+    (define (ensure-lea-safe ref)
+      (if (is-syntax? 'data ref)
+          (mov ref 'result)
+          ""))
 
 ;;; tagged pointer representation
     (define max-fixnum (expt 2 60))
@@ -58,7 +76,6 @@
           PSCM-S-UNSPECIFIED
           PSCM-S-UNBOUND)
 
-
     (define (tag-pointer ptr tag)
       (+ ptr tag))
 
@@ -67,16 +84,34 @@
 
 ;;; general purpose operations:
 
+    (define (mem-ref? r)
+      (not (or (eq? 'result r)
+               (is-syntax? 'immediate r)
+               (eq? 'unspecified r)
+               (string? r))))
+
     (define (mov src dest)
-      (format "    movq ~a, ~a\n" (x86-arg src) (x86-arg dest)))
+      (cond
+       ((equal? src dest) "") ; elide mov %rax, %rax
+       ((is-syntax? 'data src)
+        (format "    leaq ~a(%rip), ~a\n" (cadr src) (x86-arg dest)))
+       ((and (mem-ref? src) (mem-ref? dest)) ; you call yourself a CISC architecture?
+        (format "    movq ~a, %rcx\n    mov %rcx, ~a\n" (x86-arg src) (x86-arg dest)))
+       (else
+        (format "    movq ~a, ~a\n" (x86-arg src) (x86-arg dest)))))
 
     (define (stack-alloc n)
       (format "    sub $~a, %rsp\n" (* word-size n)))
 
 ;;; complex syntax operations
 
-    (define (if-prologue key)
-      (format "    cmp $~a, %rax\n    je _if_false_~a\n" (tag-number PSCM-S-F PSCM-T-SINGLETON) key))
+    (define (if-prologue value key)
+      (format "~a~a    cmpq $~a, ~a\n    je _if_false_~a\n"
+              (ensure-lea-safe value)
+              (if (is-syntax? 'immediate value) (mov value 'result) "")
+              (tag-number PSCM-S-F PSCM-T-SINGLETON)
+              (x86-arg-lea-safe (if (is-syntax? 'immediate value) 'result value))
+              key))
 
     (define (if-middle key)
       (format "    jmp _if_end_~a\n_if_false_~a:\n" key key))
@@ -88,12 +123,6 @@
       (define label (mangle lib sym))
       ;; TODO: replace 0 with undefined constant
       (format "\n    .data\n    .global ~a\n    .align 8\n~a:\t.8byte 0\n" label label))
-
-    (define (load-lambda label)
-      (format "    lea ~a(%rip), %rax\n" label))
-
-    ;(define (load-literal literal)
-    ;  (format "    mov $~a, %rax\n" literal))
 
 ;;; literal representations
     (define (fixnum-literal value)
@@ -110,7 +139,7 @@
                               ((#t) PSCM-S-T)) PSCM-T-SINGLETON)))
 
     (define (cons-literal label left right)
-      (format "\n    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label left right))
+      (format "\n    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label (x86-data left) (x86-data right)))
 
     (define (string-literal label value)
       (format "\n    .data\n    .align 16\n~a:\t.asciz ~s\n" label value))
@@ -121,16 +150,10 @@
                 ((pair) PSCM-T-CONS)
                 ((string) PSCM-T-STRING))))
 
-
-    (define (load-immediate-literal literal)
-      (format "    mov $~a, %rax\n" literal))
-
-    (define (load-data-literal literal)
-      (format "    lea ~a(%rip), %rax\n" literal))
-
 ;;; closures
-    (define (enclose args)
-      (format "    mov %rax, %r12\n    push %rdi\n    mov $~a, %rdi\n    call pscheme_allocate_block\n    pop %rdi\n    mov %r12, 0(%rax)\n~a"
+    (define (enclose l args)
+      (format "~a    push %rdi\n    mov $~a, %rdi\n    call pscheme_allocate_block\n    pop %rdi\n    mov %r12, 0(%rax)\n~a"
+              (mov l "%r12")
               (+ 1 (* word-size (length args)))
               (apply string-append
                      (map (lambda (arg i)
@@ -149,11 +172,15 @@
       ;"    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
       "    mov %rbp, %rsp\n    pop %rbp\n    pop %rbx\n    ret\n")
 
-    (define (prepare)
-      "    push %rax\n    push %rdi\n")
+    (define (prepare fn)
+      (format "~a    push ~a\n    push %rdi\n"
+              (ensure-lea-safe fn)
+              (x86-arg-lea-safe fn)))
 
-    (define (pusharg)
-      "    push %rax\n")
+    (define (pusharg value)
+      (format "~a    push ~a\n"
+              (ensure-lea-safe value)
+              (x86-arg-lea-safe value)))
 
     (define (call nargs)
       (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
@@ -179,28 +206,28 @@
 
 ;;; builtins
 
+    (define (assert-nargs nargs op target)
+      (unless (op nargs target)
+        (error "builtin: wrong number of args" nargs)))
+
     (define (builtin-eq? nargs)
       (define eqt (genlabel "eqt"))
-      (unless (= nargs 2)
-        (error "builtin-eq? does not yet support nargs of" nargs))
+      (assert-nargs nargs = 2)
       (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    cmp 8(%rsp), %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
               (singleton-literal #t) eqt (singleton-literal #f) eqt))
 
     (define (builtin-typep nargs tag)
       (define label (genlabel "typep"))
-      (unless (= nargs 1)
-        (error "builtin-typep nargs =" nargs))
+      (assert-nargs nargs = 1)
       (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    and $0xf, %rcx\n    cmp $~a, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
               (singleton-literal #t) tag label (singleton-literal #f) label))
 
     (define (builtin-ptr->ffi nargs)
-      (unless (= nargs 1)
-        (error "builtin-ptr->ffi nargs =" nargs))
+      (assert-nargs nargs = 1)
       (format "    mov (%rsp), %rax\n    shr $4, %rax\n    shl $4, %rax"))
 
     (define (builtin-num->ffi nargs)
-      (unless (= nargs 1)
-        (error "builtin-num->ffi nargs =" nargs))
+      (assert-nargs nargs = 1)
       (format "    mov (%rsp), %rax\n    shr $4, %rax"))
 
     #;(define (builtin-ffi-call nargs)
@@ -243,7 +270,6 @@
         (if-prologue . ,if-prologue)
         (if-end . ,if-end)
         (global-define-slot . ,global-define-slot)
-        (load-lambda . ,load-lambda)
         (enclose . ,enclose)
         (prologue . ,prologue)
         (accumulate-rest . ,accumulate-rest)
@@ -261,8 +287,6 @@
         (cons-literal . ,cons-literal)
         (string-literal . ,string-literal)
         (tag-label . ,tag-label)
-        (load-immediate-literal . ,load-immediate-literal)
-        (load-data-literal . ,load-data-literal)
         (builtin . ,builtin)
         (push-builtin-arg . ,push-builtin-arg)
         (pop-builtin-args . ,pop-builtin-args)))
