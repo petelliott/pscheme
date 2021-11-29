@@ -31,6 +31,8 @@
         (format "~a(%rip)" (mangle (cadr ref) (caddr ref))))
        ((is-syntax? 'immediate ref)
         (format "$~a" (cadr ref)))
+       ((is-syntax? 'stack ref)
+        (format "~a(%rsp)" (* (cadr ref) word-size)))
        ((eq? ref 'unspecified)
         (format "$~a" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON)))
        ((string? ref) ref)
@@ -93,6 +95,8 @@
     (define (mov src dest)
       (cond
        ((equal? src dest) "") ; elide mov %rax, %rax
+       ((and (is-syntax? 'data src) (mem-ref? dest))
+        (format "    leaq ~a(%rip), %rcx\n    movq %rcx, ~a\n" (cadr src) (x86-arg dest)))
        ((is-syntax? 'data src)
         (format "    leaq ~a(%rip), ~a\n" (cadr src) (x86-arg dest)))
        ((and (mem-ref? src) (mem-ref? dest)) ; you call yourself a CISC architecture?
@@ -206,29 +210,35 @@
 
 ;;; builtins
 
-    (define (assert-nargs nargs op target)
-      (unless (op nargs target)
-        (error "builtin: wrong number of args" nargs)))
+    (define (assert-nargs args op target)
+      (unless (op (length args) target)
+        (error "builtin: wrong number of args" args)))
 
-    (define (builtin-eq? nargs)
+    (define (builtin-eq? args)
       (define eqt (genlabel "eqt"))
-      (assert-nargs nargs = 2)
-      (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    cmp 8(%rsp), %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
-              (singleton-literal #t) eqt (singleton-literal #f) eqt))
+      (assert-nargs args = 2)
+      (format "~a~a    mov $~a, %rax\n    cmpq %r8, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
+              (mov (cadr args) "%r8")
+              (mov (car args) "%rcx")
+              (singleton-literal #t)
+              eqt (singleton-literal #f) eqt))
 
-    (define (builtin-typep nargs tag)
+    (define (builtin-typep args tag)
       (define label (genlabel "typep"))
-      (assert-nargs nargs = 1)
-      (format "    mov $~a, %rax\n    mov (%rsp), %rcx\n    and $0xf, %rcx\n    cmp $~a, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
+      (assert-nargs args = 1)
+      (format "~a    mov $~a, %rax\n    and $0xf, %rcx\n    cmp $~a, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
+              (mov (car args) "%rcx")
               (singleton-literal #t) tag label (singleton-literal #f) label))
 
-    (define (builtin-ptr->ffi nargs)
+    (define (builtin-ptr->ffi args)
       (assert-nargs nargs = 1)
-      (format "    mov (%rsp), %rax\n    shr $4, %rax\n    shl $4, %rax"))
+      (format "~a    shr $4, %rax\n    shl $4, %rax"
+              (mov (car args) "%rax")))
 
-    (define (builtin-num->ffi nargs)
+    (define (builtin-num->ffi args)
       (assert-nargs nargs = 1)
-      (format "    mov (%rsp), %rax\n    shr $4, %rax"))
+      (format "~a    shr $4, %rax"
+              (mov (car ars) "%rax")))
 
     #;(define (builtin-ffi-call nargs)
       (define regs '("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
@@ -243,10 +253,10 @@
 
     (define builtins
       `((eq? . ,builtin-eq?)
-        (fixnum? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-FIXNUM)))
-        (pair? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-CONS)))
-        (string? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-STRING)))
-        (char? . ,(lambda (nargs) (builtin-typep nargs PSCM-T-CHAR)))
+        (fixnum? . ,(lambda (args) (builtin-typep args PSCM-T-FIXNUM)))
+        (pair? . ,(lambda (args) (builtin-typep args PSCM-T-CONS)))
+        (string? . ,(lambda (args) (builtin-typep args PSCM-T-STRING)))
+        (char? . ,(lambda (args) (builtin-typep args PSCM-T-CHAR)))
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
         (char->ffi . ,builtin-ptr->ffi)))
@@ -254,8 +264,8 @@
     (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))
 
-    (define (push-builtin-arg)
-      "    push %rax\n")
+    (define (push-builtin-arg ref)
+      (format "    push ~a\n" (x86-arg ref)))
 
     (define (pop-builtin-args n)
       (format "    add $~a, %rsp\n" (* n word-size)))

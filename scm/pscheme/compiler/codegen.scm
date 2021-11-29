@@ -95,7 +95,7 @@
         (let ((label (genlabel "pscm_string")))
           (enter-block-environment
            (lambda () (emit 'string-literal label literal)))
-          `(data (emit-eval 'tag-label label 'string))))
+          `(data ,(emit-eval 'tag-label label 'string))))
        (else (error "can't generate code for literal: " literal))))
 
     (define (codegen-ref expr)
@@ -136,12 +136,30 @@
       'result)
 
     (define (codegen-builtin builtin args)
-      (for-each (lambda (expr)
-                  (codegen-expr expr)
-                  (emit 'push-builtin-arg))
-                args)
-      (emit 'builtin builtin (length args))
-      (emit 'pop-builtin-args (length args))
+      (define rargs (reverse args))
+      (define last (car rargs))
+      (define notlast (reverse (cdr rargs)))
+      (define pushed 0)
+
+      (define refs
+        (append
+         (map (lambda (ref)
+                (if (is-syntax? 'pushed ref)
+                   `(stack ,(- pushed (cadr ref)))
+                   ref))
+              (map (lambda (expr)
+                     (define ref (codegen-expr expr))
+                     (if (eq? 'result ref)
+                         (begin
+                           (emit 'push-builtin-arg ref)
+                           (set! pushed (+ pushed 1))
+                           `(pushed ,pushed))
+                         ref))
+                   notlast))
+         (list (codegen-expr last))))
+
+      (emit 'builtin builtin refs)
+      (emit 'pop-builtin-args pushed)
       'result)
 
     ))
