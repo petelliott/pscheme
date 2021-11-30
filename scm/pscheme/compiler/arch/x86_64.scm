@@ -217,14 +217,15 @@
       (unless (op (length args) target)
         (error "builtin: wrong number of args" args)))
 
-    (define (builtin-eq? args)
-      (define eqt (genlabel "eqt"))
+    (define (builtin-cmp args inst)
+      (define cmp-label (genlabel "cmp"))
       (assert-nargs args = 2)
-      (format "~a~a    mov $~a, %rax\n    cmpq %r8, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
+      (format "~a~a    mov $~a, %rax\n    cmpq %r8, %rcx\n    ~a ~a\n    mov $~a, %rax\n~a:\n"
               (mov (cadr args) "%r8")
               (mov (car args) "%rcx")
               (singleton-literal #t)
-              eqt (singleton-literal #f) eqt))
+              inst
+              cmp-label (singleton-literal #f) cmp-label))
 
     (define (builtin-typep args tag)
       (define label (genlabel "typep"))
@@ -232,6 +233,13 @@
       (format "~a    mov $~a, %rax\n    and $0xf, %rcx\n    cmp $~a, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
               (mov (car args) "%rcx")
               (singleton-literal #t) tag label (singleton-literal #f) label))
+
+    (define (builtin-fixnum-binop args inst)
+      (assert-nargs args = 2)
+      (format "~a~a    shr $4, %rcx\n    shr $4, %rax\n    ~a %rcx, %rax\n    shl $4, %rax\n    or $~a, %rax\n"
+              (mov (cadr args) "%rcx")
+              (mov (car args) 'result)
+              inst PSCM-T-FIXNUM))
 
     (define (builtin-ptr->ffi args)
       (assert-nargs nargs = 1)
@@ -255,7 +263,13 @@
               (ffi-pushargs)))
 
     (define builtins
-      `((eq? . ,builtin-eq?)
+      `((eq? . ,(lambda (args) (builtin-cmp args "je")))
+        (fixnum< . ,(lambda (args) (builtin-cmp args "jl")))
+        (fixnum<= . ,(lambda (args) (builtin-cmp args "jle")))
+        (fixnum+ . ,(lambda (args) (builtin-fixnum-binop args "add")))
+        (fixnum* . ,(lambda (args) (builtin-fixnum-binop args "imul")))
+        (fixnum- . ,(lambda (args) (builtin-fixnum-binop args "sub")))
+        (fixnum/ . ,(lambda (args) (builtin-fixnum-binop args "idiv")))
         (fixnum? . ,(lambda (args) (builtin-typep args PSCM-T-FIXNUM)))
         (pair? . ,(lambda (args) (builtin-typep args PSCM-T-CONS)))
         (string? . ,(lambda (args) (builtin-typep args PSCM-T-STRING)))

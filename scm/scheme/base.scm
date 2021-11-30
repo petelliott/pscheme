@@ -1,6 +1,10 @@
 (define-library (scheme base)
   (export eq?
-          number? integer? * + - <=
+          ;; 6.2: Numbers
+          number? complex? real? rational? integer? exact? inexact?
+          exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
+          negative? max min + * - / abs
+          ;; 6.3: Booleans
           not boolean?
           pair? cons car cdr caar cadr cdar cddr null? list? make-list list length append reverse
           newline
@@ -170,8 +174,82 @@
     (define (number? obj)
       (or (integer? obj)))
 
+    ;; TODO: implement these types
+    (define (complex? obj) (number? obj))
+    (define (real? obj) (number? obj))
+    (define (rational? obj) (number? obj))
+
     (define (integer? obj)
       (or (builtin fixnum? obj)))
+
+    (define (exact? obj) (integer? obj))
+    (define (inexact? obj) #f)
+    (define (exact-integer? obj) (integer? obj))
+    (define (finite? obj) (number? obj))
+    (define (infinite? obj) #f)
+    (define (nan? obj) #f)
+
+    (define (bool-fold fn first rest)
+      (or (null? rest)
+          (and (fn first (car rest))
+               (bool-fold fn (car rest) (cdr rest)))))
+
+    (define (= n1 n2 . rest)
+      (bool-fold eq? n1 (cons n2 rest)))
+
+    (define (< n1 n2 . rest)
+      (bool-fold (lambda (a b) (builtin fixnum< a b)) n1 (cons n2 rest)))
+
+    (define (<= n1 n2 . rest)
+      (bool-fold (lambda (a b) (builtin fixnum<= a b)) n1 (cons n2 rest)))
+
+    (define (> n1 n2 . rest)
+      (bool-fold (lambda (a b) (not (builtin fixnum<= a b))) n1 (cons n2 rest)))
+
+    (define (>= n1 n2 . rest)
+      (bool-fold (lambda (a b) (not (builtin fixnum< a b))) n1 (cons n2 rest)))
+
+    (define (zero? n) (= n 0))
+    (define (positive? n) (> n 0))
+    (define (negative? n) (< n 0))
+
+    (define (order op ns curr)
+      (cond
+       ((null? ns) curr)
+       ((op (car ns) curr) (order op (cdr ns) (car ns)))
+       (else (order op (cdr ns) curr))))
+
+    (define (max n1 . rest)
+      (order > rest n1))
+
+    (define (min n1 . rest)
+      (order < rest n1))
+
+    (define (num-fold fn acc rest)
+      (if (null? rest)
+          acc
+          (num-fold fn (fn acc (car rest)) (cdr rest))))
+
+    (define (+ n1 . rest)
+      (num-fold (lambda (a b) (builtin fixnum+ a b)) n1 rest))
+
+    (define (* n1 . rest)
+      (num-fold (lambda (a b) (builtin fixnum* a b)) n1 rest))
+
+    (define (- n1 . rest)
+      (if (null? rest)
+          (builtin fixnum- 0 n1)
+          (num-fold (lambda (a b) (builtin fixnum- a b)) n1 rest)))
+
+    (define (/ n1 . rest)
+      (if (null? rest)
+          (builtin fixnum/ 1 n1)
+          (num-fold (lambda (a b) (builtin fixnum/ a b)) n1 rest)))
+
+    (define (abs n)
+      (if (negative? n)
+          (- n)
+          n))
 
     ;;; 6.3: Booleans
 
