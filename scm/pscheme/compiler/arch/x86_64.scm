@@ -13,7 +13,7 @@
     ;; registers:
     ;; result register:     %rax (caller saved)
     ;; frame pointer:       %rbp (callee saved)
-    ;; argument pointer:    %rdi (caller and callee saved)
+    ;; argument pointer:    %r13 (caller saved in pscheme, callee saved in C for ease of ffi)
     ;; closure registers:   %rbx (callee saved)
 
     ;; temprorary registers: %rcx, %r12
@@ -26,7 +26,7 @@
        ((is-syntax? 'closure ref)
         (format "~a(%rbx)" (* (+ (cadr ref) 1) word-size)))
        ((is-syntax? 'arg ref)
-        (format "~a(%rdi)" (- (* (+ (cadr ref) 1) word-size))))
+        (format "~a(%r13)" (- (* (+ (cadr ref) 1) word-size))))
        ((is-syntax? 'global ref)
         (format "~a(%rip)" (mangle (cadr ref) (caddr ref))))
        ((is-syntax? 'immediate ref)
@@ -69,7 +69,9 @@
           PSCM-T-SINGLETON
           PSCM-T-STRING
           PSCM-T-CHAR
-          PSCM-T-CLOSURE)
+          PSCM-T-CLOSURE
+          PSCM-T-SYMBOL
+          PSCM-T-FOREIGN)
 
     (enum singletons
           PSCM-S-NIL
@@ -157,7 +159,7 @@
 
 ;;; closures
     (define (enclose l args)
-      (format "~a    push %rdi\n    mov $~a, %rdi\n    call pscheme_allocate_block\n    pop %rdi\n    mov %r12, 0(%rax)\n~a    or $~a, %rax\n"
+      (format "~a    mov $~a, %rdi\n    call pscheme_allocate_block\n    mov %r12, 0(%rax)\n~a    or $~a, %rax\n"
               (mov l "%r12")
               (+ 1 (* word-size (length args)))
               (apply string-append
@@ -168,19 +170,18 @@
 
 ;;; pscheme calling convention
     (define (prologue label)
-      (format "\n    .text\n~a:\n    push %rbx\n    mov 8(%rdi), %rbx\n    shr $4, %rbx\n    shl $4, %rbx\n    push %rbp\n    mov %rsp, %rbp\n"
+      (format "\n    .text\n~a:\n    push %rbx\n    mov 8(%r13), %rbx\n    shr $4, %rbx\n    shl $4, %rbx\n    push %rbp\n    mov %rsp, %rbp\n"
               label))
 
     (define (accumulate-rest nregular ref)
-      (format "    mov $~a, %rsi\n    call pscm_internal_rest\n    mov %rax, ~a\n"
+      (format "    mov $~a, %rdi\n    call pscm_internal_rest\n    mov %rax, ~a\n"
               nregular (x86-arg ref)))
 
     (define (epilogue)
-      ;"    mov %rbp, %rsp\n    pop %rbp\n    pop %r11\n    mov %rdi, %rsp\n    push %r11\n    ret\n")
       "    mov %rbp, %rsp\n    pop %rbp\n    pop %rbx\n    ret\n")
 
     (define (prepare fn)
-      (format "~a    push ~a\n    push %rdi\n"
+      (format "~a    push ~a\n    push %r13\n"
               (ensure-lea-safe fn)
               (x86-arg-lea-safe fn)))
 
@@ -190,13 +191,13 @@
               (x86-arg-lea-safe value)))
 
     (define (call nargs)
-      (format "    lea ~a(%rsp), %rdi\n    call *~a(%rsp)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
+      (format "    lea ~a(%rsp), %r13\n    call *~a(%rsp)\n    mov %r13, %rsp\n    pop %r13\n    add $8, %rsp\n"
               (* word-size nargs)
               (* word-size (+ nargs 1))))
 
     ;; like call but with the double indirection for the closure
     (define (call-closure nargs)
-      (format "    lea ~a(%rsp), %rdi\n    mov ~a(%rsp), %rax\n    shr $4, %rax\n    shl $4, %rax\n    call *(%rax)\n    mov %rdi, %rsp\n    pop %rdi\n    add $8, %rsp\n"
+      (format "    lea ~a(%rsp), %r13\n    mov ~a(%rsp), %rax\n    shr $4, %rax\n    shl $4, %rax\n    call *(%rax)\n    mov %r13, %rsp\n    pop %r13\n    add $8, %rsp\n"
               (* word-size nargs)
               (* word-size (+ nargs 1))))
 
@@ -249,7 +250,8 @@
     (define (builtin-num->ffi args)
       (assert-nargs nargs = 1)
       (format "~a    shr $4, %rax"
-              (mov (car ars) "%rax")))
+              (mov (car args) "%rax")))
+
 
     #;(define (builtin-ffi-call nargs)
       (define regs '("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
