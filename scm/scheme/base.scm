@@ -6,7 +6,9 @@
           negative? max min + * - / abs
           ;; 6.3: Booleans
           not boolean?
-          pair? cons car cdr caar cadr cdar cddr null? list? make-list list length append reverse
+          ;; 6.4: Pairs and Lists
+          pair? cons car cdr caar cadr cdar cddr null? list? make-list list
+          length append reverse
           newline
           write
           cond case and or when unless let let* letrec letrec*
@@ -262,10 +264,17 @@
 
     ;;; 6.4: Pairs and lists
 
-    ;; written in C: cons, car, cdr.
-
     (define (pair? obj)
       (builtin pair? obj))
+
+    (define (cons a b)
+      (builtin cons a b))
+
+    (define (car obj)
+      (builtin car obj))
+
+    (define (cdr obj)
+      (builtin cdr obj))
 
     (define (caar p)
       (car (car p)))

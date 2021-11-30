@@ -16,7 +16,7 @@
     ;; argument pointer:    %r13 (caller saved in pscheme, callee saved in C for ease of ffi)
     ;; closure registers:   %rbx (callee saved)
 
-    ;; temprorary registers: %rcx, %r12
+    ;; temprorary registers: %rcx, %r12, %r14
 
     (define (x86-arg ref)
       (cond
@@ -242,6 +242,19 @@
               (mov (car args) 'result)
               inst PSCM-T-FIXNUM))
 
+    (define (builtin-cons args)
+      (assert-nargs args = 2)
+      (format "~a~a     call pscheme_allocate_cell\n    mov %r12, 0(%rax)\n    mov %r14, 8(%rax)\n    or $~a, %rax\n"
+              (mov (car args) "%r12")
+              (mov (cadr args) "%r14")
+              PSCM-T-CONS))
+
+    (define (builtin-car/cdr args off)
+      (assert-nargs args = 1)
+      (format "~a    shr $4, %rax\n    shl $4, %rax\n    mov ~a(%rax), %rax\n"
+              (mov (car args) 'result)
+              off))
+
     (define (builtin-ptr->ffi args)
       (assert-nargs nargs = 1)
       (format "~a    shr $4, %rax\n    shl $4, %rax"
@@ -277,6 +290,9 @@
         (string? . ,(lambda (args) (builtin-typep args PSCM-T-STRING)))
         (char? . ,(lambda (args) (builtin-typep args PSCM-T-CHAR)))
         (procedure? . ,(lambda (args) (builtin-typep args PSCM-T-CLOSURE)))
+        (cons . ,builtin-cons)
+        (car . ,(lambda (args) (builtin-car/cdr args 0)))
+        (cdr . ,(lambda (args) (builtin-car/cdr args 8)))
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
         (char->ffi . ,builtin-ptr->ffi)))
