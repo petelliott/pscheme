@@ -30,14 +30,18 @@
        ((eq? sym (frame-rest-arg frame))  `(stack ,(length (frame-locals frame))))
        ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
        ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
-       ((assq sym (frame-closure frame))  (assq sym (frame-closure frame)))
+       ((assq sym (frame-closure frame))  (error "this is fake")) ;(assq sym (frame-closure frame)))
        (else
         (let ((parent-ref (lookup-var! sym (frame-parent frame))))
           (if (is-syntax? 'global parent-ref)
               parent-ref
-              (begin
-                (set-frame-closure! frame (cons parent-ref (frame-closure frame)))
-                `(closure ,(- (length (frame-closure frame)) 1))))))))
+              (let ((clos (member parent-ref (frame-closure frame))))
+                (if clos
+                    `(closure ,(- (length clos) 1))
+                    (begin
+                      (set-frame-closure! frame (cons parent-ref (frame-closure frame)))
+                      `(closure ,(- (length (frame-closure frame)) 1))))))))))
+
 
     (define (dump-frame frame)
       (if (null? frame)
