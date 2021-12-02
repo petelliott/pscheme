@@ -1,17 +1,24 @@
 (import (scheme base)
         (scheme process-context)
-        (srfi 1))
+        (srfi 1)
+        (scheme write))
 
 (import (pscheme base)
         (pscheme compiler arch x86_64)
         (pscheme compiler compile)
-        (pscheme compiler library))
+        (pscheme compiler library)
+        (pscheme compiler options))
 
 (define opts (getopt (command-line)
                      '((include #\I #t)
                        (lib #\L #t)
                        (output #\o #t)
-                       (arch #\a #t)))) ; TODO: support arch flag
+                       (arch #\a #t)
+                       (ir #\z #f)))) ; TODO: support arch flag
+
+(define (assoc-ref key list)
+  (define a (assoc key list))
+  (if a (cdr a) a))
 
 (add-to-load-path ".")
 (for-each add-to-load-path
@@ -22,6 +29,7 @@
   (map cdr (filter (lambda (m) (eq? (car m) 'lib))
                    opts)))
 
-(compile-project x86_64 (cadr (assoc 'rest opts))
-                 (cdr (or (assoc 'output opts) '(output . "a.out")))
-                 libs)
+(optionize ((ir (assoc-ref 'ir opts)))
+           (compile-project x86_64 (cadr (assoc 'rest opts))
+                            (or (assoc-ref 'output opts) "a.out")
+                            libs))

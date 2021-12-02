@@ -2,13 +2,14 @@
   (import (scheme base)
           (scheme file)
           (scheme read)
-          (scheme write)
           (srfi-28)
           (pscheme string)
           (pscheme compiler arch)
           (pscheme compiler arch x86_64)
           (pscheme compiler frontend)
           (pscheme compiler codegen)
+          (pscheme compiler options)
+          (pscheme compiler writeir)
           (only (gauche base) sys-system))
   (export compile-project
           compile-file
@@ -44,12 +45,20 @@
                             (string-join " " (linker-objs (linker-opts)))
                             outfile))))
 
+    (define (writeir-for filename ir)
+      (define irfile (string-append filename ".pir"))
+      (when (option 'ir)
+        (call-with-output-file irfile
+          (lambda (port)
+            (writeir ir port)))))
+
     (define (compile-file target filename program-or-lib)
       (define asmfile (string-append filename ".s"))
       (define objfile (string-append filename ".o"))
       (compile-environment asmfile target
                            (lambda ()
                              (define ir (map frontend (read-file filename)))
+                             (writeir-for filename ir)
                              (case program-or-lib
                                ((program) (codegen-main-file ir))
                                ((library) (codegen-library-file ir))

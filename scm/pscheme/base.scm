@@ -35,7 +35,7 @@
          ((null? opts) (list (cons 'rest (reverse rest))))
          ((string=? (car opts) "--") (list (cons rest (append (reverse rest) (cdr opts)))))
          ((string-starts-with (car opts) "--")
-          (let ((rule (assoc (string->symbol (substring (car opts) 2))
+          (let ((rule (assoc (string->symbol (substring (car opts) 2 (string-length (car opts))))
                              grammar)))
             (cond
              ((not rule) (error "unknown option " (car opts)))
