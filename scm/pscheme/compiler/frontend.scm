@@ -134,7 +134,8 @@
              ,(frontend-expr (caddr form) scope)
              ,(frontend-expr (cadddr form) scope)))
        ((is-syntax? 'set! form)
-        `(set! ,(lookup-var! (cadr form)) ,(frontend-expr (caddr form) scope)))
+
+        `(set! ,(lookup-var! (cadr form) scope) ,(frontend-expr (caddr form) scope)))
        ((is-syntax? 'lambda form) (frontend-lambda form scope))
        ((pair? form) (cons 'call (map (lambda (form) (frontend-expr form scope)) form)))
        ((symbol? form) `(ref ,(lookup-var! form scope)))

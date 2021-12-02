@@ -82,6 +82,7 @@
         ((closure) (codegen-closure expr))
         ((begin)   (codegen-block codegen-expr (cdr expr)))
         ((builtin) (codegen-builtin (cadr expr) (cddr expr)))
+        ((set!)    (codegen-set (cadr expr) (caddr expr)))
         (else (error "unsuported expression " expr))))
 
     (define (codegen-literal literal)
@@ -165,5 +166,8 @@
       (emit 'builtin builtin refs)
       (emit 'pop-builtin-args pushed)
       'result)
+
+    (define (codegen-set ref value)
+      (emit 'mov (codegen-expr value) ref))
 
     ))
