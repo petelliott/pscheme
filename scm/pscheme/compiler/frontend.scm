@@ -136,7 +136,9 @@
        ((is-syntax? 'if form)
         `(if ,(frontend-expr (cadr form) scope)
              ,(frontend-expr (caddr form) scope)
-             ,(frontend-expr (cadddr form) scope)))
+             ,@(if (null? (cdddr form))
+                   '()
+                   (list (frontend-expr (cadddr form) scope)))))
        ((is-syntax? 'set! form)
 
         `(set! ,(lookup-var! (cadr form) scope) ,(frontend-expr (caddr form) scope)))

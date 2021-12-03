@@ -132,7 +132,9 @@
       (emit 'if-prologue (codegen-expr (cadr expr)) label)
       (emit 'mov (codegen-expr (caddr expr)) 'result)
       (emit 'if-middle label)
-      (emit 'mov (codegen-expr (cadddr expr)) 'result)
+      (if (null? (cdddr expr))
+          (emit 'mov 'unspecified 'result)
+          (emit 'mov (codegen-expr (cadddr expr)) 'result))
       (emit 'if-end label)
       'result)
 
