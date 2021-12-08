@@ -6,10 +6,12 @@
     (define nomatch (cons 'unique 'value))
 
     (define-syntax match1
-      (syntax-rules (unquote)
+      (syntax-rules (unquote unquote-splicing)
         ((_ cont expr (unquote form))
          (let ((form expr))
            cont))
+        ((_ cont expr (pattern-car (unquote-splicing pattern-cdr)))
+         (match1 cont expr (pattern-car . (unquote pattern-cdr))))
         ((_ cont expr (pattern-car . pattern-cdr))
          (if (pair? expr)
              (let ((expr-car (car expr))
@@ -17,8 +19,8 @@
                (match1 (match1 cont expr-cdr pattern-cdr)
                        expr-car pattern-car))
              nomatch))
-        ((_ cont expr form)
-         (if (equal? 'form expr)
+        ((_ cont expr pattern)
+         (if (equal? 'pattern expr)
              cont
              nomatch))))
 
