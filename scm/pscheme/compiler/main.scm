@@ -16,10 +16,6 @@
                        (arch #\a #t)
                        (ir #\z #f)))) ; TODO: support arch flag
 
-(define (assoc-ref key list)
-  (define a (assoc key list))
-  (if a (cdr a) a))
-
 (add-to-load-path ".")
 (for-each add-to-load-path
           (map cdr (filter (lambda (m) (eq? (car m) 'include))

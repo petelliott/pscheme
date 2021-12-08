@@ -2,7 +2,8 @@
   (import (scheme base)
           (scheme cxr)
           (pscheme string))
-  (export getopt)
+  (export getopt
+          assoc-ref)
   (begin
 
     ;; grammar is of the form ((sym #\shortform hasvalue) ...)
@@ -49,5 +50,9 @@
           (single-char-arg opts rest 1 (string-length (car opts))))
          (else (inner (cdr opts) (cons (car opts) rest)))))
       (inner (cdr opts) '()))
+
+    (define (assoc-ref key alist)
+      (define result (assoc key alist))
+      (if result (cdr result) result))
 
     ))
