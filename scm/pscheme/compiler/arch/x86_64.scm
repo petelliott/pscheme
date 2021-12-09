@@ -237,10 +237,18 @@
 
     (define (builtin-fixnum-binop args inst)
       (assert-nargs args = 2)
-      (format "~a~a    shr $4, %rcx\n    shr $4, %rax\n    ~a %rcx, %rax\n    shl $4, %rax\n    or $~a, %rax\n"
+      (format "~a~a    sar $4, %rcx\n    sar $4, %rax\n~a    ~a %rcx, %rax\n    sal $4, %rax\n    or $~a, %rax\n"
               (mov (cadr args) "%rcx")
               (mov (car args) 'result)
+              (if (string=? inst "idiv") "    cqo\n" "")
               inst PSCM-T-FIXNUM))
+
+    (define (builtin-fixnum-remainder args)
+      (assert-nargs args = 2)
+      (format "~a~a    sar $4, %rcx\n    sar $4, %rax\n    cqo\n    idiv %rcx, %rax\n    mov %rdx, %rax\n    sal $4, %rax\n    or $~a, %rax\n"
+              (mov (cadr args) "%rcx")
+              (mov (car args) 'result)
+              PSCM-T-FIXNUM))
 
     (define (builtin-cons args)
       (assert-nargs args = 2)
@@ -297,6 +305,7 @@
         (fixnum* . ,(lambda (args) (builtin-fixnum-binop args "imul")))
         (fixnum- . ,(lambda (args) (builtin-fixnum-binop args "sub")))
         (fixnum/ . ,(lambda (args) (builtin-fixnum-binop args "idiv")))
+        (fixnum-remainder . ,builtin-fixnum-remainder)
         (fixnum? . ,(lambda (args) (builtin-typep args PSCM-T-FIXNUM)))
         (pair? . ,(lambda (args) (builtin-typep args PSCM-T-CONS)))
         (string? . ,(lambda (args) (builtin-typep args PSCM-T-STRING)))

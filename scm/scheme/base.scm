@@ -1,10 +1,11 @@
 (define-library (scheme base)
   (import (pscheme ffi))
   (export eq?
+          write
           ;; 6.2: Numbers
           number? complex? real? rational? integer? exact? inexact?
           exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
-          negative? max min + * - / abs
+          negative? max min + * - / quotient remainder modulo abs
           ;; 6.3: Booleans
           not boolean?
           ;; 6.4: Pairs and Lists
@@ -248,6 +249,15 @@
       (if (null? rest)
           (builtin fixnum/ 1 n1)
           (num-fold (lambda (a b) (builtin fixnum/ a b)) n1 rest)))
+
+    (define (quotient n1 n2)
+      (builtin fixnum/ n1 n2))
+
+    (define (remainder n1 n2)
+      (builtin fixnum-remainder n1 n2))
+
+    (define (modulo n1 n2)
+      (remainder (+ (remainder n1 n2) n2) n2))
 
     (define (abs n)
       (if (negative? n)
