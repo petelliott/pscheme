@@ -284,7 +284,8 @@
          (else
           (cons (mov (car args) (car regs))
                 (push-args (cdr args) (cdr regs))))))
-      (format "~a    call ~a\n"
+      ;; we need to clear %rax when calling variadic functions
+      (format "~a    xor %rax, %rax\n    call ~a\n"
               (apply string-append (push-args (cdr args) regs))
               (x86-arg (car args))))
 
@@ -306,7 +307,7 @@
         (cdr . ,(lambda (args) (builtin-car/cdr args 8)))
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
-        (char->ffi . ,builtin-ptr->ffi)
+        (char->ffi . ,builtin-num->ffi)
         (ffi->fixnum . ,(lambda (args) (builtin-ffi->num args PSCM-T-FIXNUM)))
         (ffi->char . ,(lambda (args) (builtin-ffi->num args PSCM-T-CHAR)))
         (ffi-call . ,builtin-ffi-call)))

@@ -1,4 +1,5 @@
 (define-library (scheme base)
+  (import (pscheme ffi))
   (export eq?
           ;; 6.2: Numbers
           number? complex? real? rational? integer? exact? inexact?
@@ -9,12 +10,12 @@
           ;; 6.4: Pairs and Lists
           pair? cons car cdr caar cadr cdar cddr null? list? make-list list
           length append reverse
-          newline
-          write
           cond case and or when unless let let* letrec letrec*
           char?
           string?
-          procedure?)
+          procedure?
+          ;; 6.13: Input and Output
+          newline write-char write-string write-u8)
   (begin
     ;;; 7.3: Derived expression types
 
@@ -338,5 +339,26 @@
 
     (define (procedure? obj)
       (builtin procedure? obj))
+
+
+    ;; 6.13: Input and Output
+
+    ;; 6.13.3: Output
+
+    (define strprintf (ff->scheme void printf (char* fmt) (char* value)))
+    (define chprintf (ff->scheme void printf (char* fmt) (char value)))
+    (define intprintf (ff->scheme void printf (char* fmt) (int value)))
+
+    (define (newline)
+      (write-char #\newline))
+
+    (define (write-char char)
+      (chprintf "%c" char))
+
+    (define (write-string string)
+      (strprintf "%s" string))
+
+    (define (write-u8 byte)
+      (intprintf "%c" byte))
 
     ))

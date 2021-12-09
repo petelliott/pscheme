@@ -3,13 +3,6 @@
 #include <assert.h>
 #include <stdio.h>
 
-pscheme_fn(scheme$$base$$newline) {
-    pscheme_start();
-    assert(pscheme_nargs() == 0);
-    printf("\n");
-    pscheme_return(PSCM_UNSPECIFIED);
-}
-
 // TODO: write this in scheme.
 static void pscheme_write(pscheme_t obj) {
     if (tag(obj) == PSCM_T_FIXNUM) {

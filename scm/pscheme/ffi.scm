@@ -1,5 +1,4 @@
 (define-library (pscheme ffi)
-  (import (scheme base))
   (export type->ffi ; exported to to an unhygenic macro system
           ffi->type
           ff->scheme)
