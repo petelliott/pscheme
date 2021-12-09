@@ -31,6 +31,8 @@
         (format "~a(%rip)" (mangle (cadr ref) (caddr ref))))
        ((is-syntax? 'immediate ref)
         (format "$~a" (cadr ref)))
+       ((is-syntax? 'ffi ref)
+        (symbol->string (cadr ref)))
        ((eq? ref 'unspecified)
         (format "$~a" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON)))
        ((string? ref) ref)
@@ -255,24 +257,36 @@
 
     (define (builtin-ptr->ffi args)
       (assert-nargs args = 1)
-      (format "~a    shr $4, %rax\n    shl $4, %rax"
+      (format "~a    shr $4, %rax\n    shl $4, %rax\n"
               (mov (car args) 'result)))
 
     (define (builtin-num->ffi args)
       (assert-nargs args = 1)
-      (format "~a    shr $4, %rax"
+      (format "~a    shr $4, %rax\n"
               (mov (car args) 'result)))
 
-    #;(define (builtin-ffi-call nargs)
+    (define (builtin-ffi->num args tag)
+      (assert-nargs args = 1)
+      (format "~a    shl $4, %rax\n    or $~a, %rax\n"
+              (mov (car args) 'result) tag))
+
+    (define (builtin-ffi-call args)
       (define regs '("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
-      (define (ffi-regarg i)
-        (when (>= i 6)
-          (error "can't pass nth arg in register:" i))
-        (format "    mov ~a(%rsp), ~a\n" (- (* word-size (- nargs i 1))) (list-ref regs i)))
-      (define (ffi-pushargs)
-        (reduce string-append "" (map ffi-regarg (iota nargs))))
-      (format "    push %rdi\n~a\n    "
-              (ffi-pushargs)))
+      (define (push-args args regs)
+        (cond
+         ((null? args) '())
+         ((null? regs)
+          (map (lambda (arg)
+                 (format "~a    push ~a\n"
+                         (ensure-lea-safe fn)
+                         (x86-arg-lea-safe fn)))
+               (reverse args)))
+         (else
+          (cons (mov (car args) (car regs))
+                (push-args (cdr args) (cdr regs))))))
+      (format "~a    call ~a\n"
+              (apply string-append (push-args (cdr args) regs))
+              (x86-arg (car args))))
 
     (define builtins
       `((eq? . ,(lambda (args) (builtin-cmp args "je")))
@@ -292,7 +306,10 @@
         (cdr . ,(lambda (args) (builtin-car/cdr args 8)))
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
-        (char->ffi . ,builtin-ptr->ffi)))
+        (char->ffi . ,builtin-ptr->ffi)
+        (ffi->fixnum . ,(lambda (args) (builtin-ffi->num args PSCM-T-FIXNUM)))
+        (ffi->char . ,(lambda (args) (builtin-ffi->num args PSCM-T-CHAR)))
+        (ffi-call . ,builtin-ffi-call)))
 
     (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))

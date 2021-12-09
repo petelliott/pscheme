@@ -143,6 +143,7 @@
 
         `(set! ,(lookup-var! (cadr form) scope) ,(frontend-expr (caddr form) scope)))
        ((is-syntax? 'lambda form) (frontend-lambda form scope))
+       ((is-syntax? 'ffi-symbol form) (frontend-ffi-symbol (cadr form)))
        ((pair? form) (cons 'call (map (lambda (form) (frontend-expr form scope)) form)))
        ((symbol? form) `(ref ,(lookup-var! form scope)))
        (else `(quote ,form))))
@@ -172,5 +173,8 @@
                `((push-locals ,nlocals)))
           ,@body)
         ,@(reverse (frame-closure new-scope))))
+
+    (define (frontend-ffi-symbol sym)
+      `(ref (ffi ,sym)))
 
     ))

@@ -154,6 +154,7 @@
       'result)
 
     (define (codegen-set ref value)
-      (emit 'mov (codegen-expr value) ref))
+      (emit 'mov (codegen-expr value) ref)
+      'unspecified)
 
     ))
