@@ -85,7 +85,7 @@
 (define (pattern-reps form matches)
   (cond
    ((is-ellipsis? form) #f)
-   ((and (symbol? form) (cadr (or (assoc form matches) '(#f ()) )))
+   ((and (symbol? form) (cadr (or (assoc form matches) '(#f #f))))
     (count-matches form matches))
    ((pair? form)
     (equalize-through-error
