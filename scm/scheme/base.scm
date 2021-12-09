@@ -1,7 +1,6 @@
 (define-library (scheme base)
   (import (pscheme ffi))
-  (export eq?
-          write
+  (export eq? eqv?
           ;; 6.2: Numbers
           number? complex? real? rational? integer? exact? inexact?
           exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
@@ -10,7 +9,8 @@
           not boolean?
           ;; 6.4: Pairs and Lists
           pair? cons car cdr caar cadr cdar cddr null? list? make-list list
-          length append reverse
+          length append reverse memq memv
+          ;; 7.3: Derived expression types
           cond case and or when unless let let* letrec letrec*
           ;; 6.6: Characters
           char? char->integer integer->char
@@ -69,18 +69,18 @@
              (begin result1 result2 ...)))
         ((case key
            ((atoms ...) => result))
-         (if (memv key ’(atoms ...))
+         (if (memv key '(atoms ...))
              (result key)))
         ((case key
            ((atoms ...) => result)
            clause clauses ...)
-         (if (memv key ’(atoms ...))
+         (if (memv key '(atoms ...))
              (result key)
              (case key clause clauses ...)))
         ((case key
            ((atoms ...) result1 result2 ...)
            clause clauses ...)
-         (if (memv key ’(atoms ...))
+         (if (memv key '(atoms ...))
              (begin result1 result2 ...)
              (case key clause clauses ...)))))
 
@@ -173,6 +173,10 @@
 
     (define (eq? a b)
       (builtin eq? a b))
+
+    ;; TODO
+    (define (eqv? a b)
+      (eq? a b))
 
     ;;; 6.2: Numbers
 
@@ -333,6 +337,18 @@
 
     (define (reverse lst)
       (reverse-inner lst '()))
+
+    (define (memq obj lst)
+      (cond
+       ((null? lst) #f)
+       ((eq? obj (car lst)) lst)
+       (else (memq obj (cdr lst)))))
+
+    (define (memv obj lst)
+      (cond
+       ((null? lst) #f)
+       ((eq? obj (car lst)) lst)
+       (else (memq obj (cdr lst)))))
 
     ;; 6.6: Characters
 
