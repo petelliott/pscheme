@@ -12,7 +12,8 @@
           pair? cons car cdr caar cadr cdar cddr null? list? make-list list
           length append reverse
           cond case and or when unless let let* letrec letrec*
-          char?
+          ;; 6.6: Characters
+          char? char->integer integer->char
           string?
           procedure?
           ;; 6.13: Input and Output
@@ -337,6 +338,13 @@
 
     (define (char? obj)
       (builtin char? obj))
+
+    (define (char->integer obj)
+      (builtin char->integer obj))
+
+    (define (integer->char obj)
+      (builtin integer->char obj))
+
 
     ;; 6.7: Strings
 

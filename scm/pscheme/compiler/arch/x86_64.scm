@@ -297,6 +297,12 @@
               (apply string-append (push-args (cdr args) regs))
               (x86-arg (car args))))
 
+    (define (builtin-retag args tag)
+      (assert-nargs args = 1)
+      (format "~a    shr $4, %rax\n    shl $4, %rax\n    or $~a, %rax\n"
+              (mov (car args) 'result)
+              tag))
+
     (define builtins
       `((eq? . ,(lambda (args) (builtin-cmp args "je")))
         (fixnum< . ,(lambda (args) (builtin-cmp args "jl")))
@@ -319,7 +325,9 @@
         (char->ffi . ,builtin-num->ffi)
         (ffi->fixnum . ,(lambda (args) (builtin-ffi->num args PSCM-T-FIXNUM)))
         (ffi->char . ,(lambda (args) (builtin-ffi->num args PSCM-T-CHAR)))
-        (ffi-call . ,builtin-ffi-call)))
+        (ffi-call . ,builtin-ffi-call)
+        (integer->char . ,(lambda (args) (builtin-retag args PSCM-T-CHAR)))
+        (char->integer . ,(lambda (args) (builtin-retag args PSCM-T-FIXNUM)))))
 
     (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))
