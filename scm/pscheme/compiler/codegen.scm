@@ -143,30 +143,14 @@
       'result)
 
     (define (codegen-builtin builtin args)
-      (define rargs (reverse args))
-      (define last (car rargs))
-      (define notlast (reverse (cdr rargs)))
-      (define pushed 0)
-
-      (define refs
-        (append
-         (map (lambda (ref)
-                (if (is-syntax? 'pushed ref)
-                   `(stack ,(- pushed (cadr ref)))
-                   ref))
-              (map (lambda (expr)
-                     (define ref (codegen-expr expr))
-                     (if (eq? 'result ref)
-                         (begin
-                           (emit 'push-builtin-arg ref)
-                           (set! pushed (+ pushed 1))
-                           `(pushed ,pushed))
-                         ref))
-                   notlast))
-         (list (codegen-expr last))))
+      (define refs (map codegen-expr args))
+      (for-each (lambda (ref)
+                  (when (eq? 'result ref)
+                    (error "only the last arg of a builtin can be 'result"
+                           `(builtin ,builtin ,@args))))
+                (cdr (reverse refs)))
 
       (emit 'builtin builtin refs)
-      (emit 'pop-builtin-args pushed)
       'result)
 
     (define (codegen-set ref value)

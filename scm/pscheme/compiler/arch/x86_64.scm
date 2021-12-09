@@ -31,8 +31,6 @@
         (format "~a(%rip)" (mangle (cadr ref) (caddr ref))))
        ((is-syntax? 'immediate ref)
         (format "$~a" (cadr ref)))
-       ((is-syntax? 'stack ref)
-        (format "~a(%rsp)" (* (cadr ref) word-size)))
        ((eq? ref 'unspecified)
         (format "$~a" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON)))
        ((string? ref) ref)
@@ -256,15 +254,14 @@
               off))
 
     (define (builtin-ptr->ffi args)
-      (assert-nargs nargs = 1)
+      (assert-nargs args = 1)
       (format "~a    shr $4, %rax\n    shl $4, %rax"
-              (mov (car args) "%rax")))
+              (mov (car args) 'result)))
 
     (define (builtin-num->ffi args)
-      (assert-nargs nargs = 1)
+      (assert-nargs args = 1)
       (format "~a    shr $4, %rax"
-              (mov (car args) "%rax")))
-
+              (mov (car args) 'result)))
 
     #;(define (builtin-ffi-call nargs)
       (define regs '("%rdi" "%rsi" "%rdx" "%rcx" "%r8" "%r9"))
@@ -300,12 +297,6 @@
     (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))
 
-    (define (push-builtin-arg ref)
-      (format "    push ~a\n" (x86-arg ref)))
-
-    (define (pop-builtin-args n)
-      (format "    add $~a, %rsp\n" (* n word-size)))
-
 ;;; exported architecture
 
     (define x86_64
@@ -333,8 +324,6 @@
         (cons-literal . ,cons-literal)
         (string-literal . ,string-literal)
         (tag-label . ,tag-label)
-        (builtin . ,builtin)
-        (push-builtin-arg . ,push-builtin-arg)
-        (pop-builtin-args . ,pop-builtin-args)))
+        (builtin . ,builtin)))
 
     ))
