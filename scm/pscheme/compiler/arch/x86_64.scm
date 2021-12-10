@@ -263,6 +263,14 @@
               (mov (car args) 'result)
               off))
 
+    (define (builtin-set-car/cdr! args off)
+      (assert-nargs args = 2)
+      (format "~a~a    shr $4, %rcx\n    shl $4, %rcx\n    mov %rax, ~a(%rcx)\n~a"
+              (mov (cadr args) "%rcx")
+              (mov (car args) 'result)
+              off
+              (mov 'unspecified 'result)))
+
     (define (builtin-ptr->ffi args)
       (assert-nargs args = 1)
       (format "~a    shr $4, %rax\n    shl $4, %rax\n"
@@ -320,6 +328,8 @@
         (cons . ,builtin-cons)
         (car . ,(lambda (args) (builtin-car/cdr args 0)))
         (cdr . ,(lambda (args) (builtin-car/cdr args 8)))
+        (set-car! . ,(lambda (args) (builtin-set-car/cdr! args 0)))
+        (set-cdr! . ,(lambda (args) (builtin-set-car/cdr! args 8)))
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
         (char->ffi . ,builtin-num->ffi)

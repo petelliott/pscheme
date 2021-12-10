@@ -1,23 +1,30 @@
 (define-library (scheme base)
   (import (pscheme ffi))
-  (export eq? eqv?
-          ;; 6.2: Numbers
-          number? complex? real? rational? integer? exact? inexact?
-          exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
-          negative? max min + * - / quotient remainder modulo abs
-          ;; 6.3: Booleans
-          not boolean?
-          ;; 6.4: Pairs and Lists
-          pair? cons car cdr caar cadr cdar cddr null? list? make-list list
-          length append reverse memq memv
-          ;; 7.3: Derived expression types
-          cond case and or when unless let let* letrec letrec*
-          ;; 6.6: Characters
-          char? char->integer integer->char
-          string?
-          procedure?
-          ;; 6.13: Input and Output
-          newline write-char write-string write-u8)
+  (export
+   ;; 7.3: Derived expression types
+   cond case and or when unless let let* letrec letrec*
+   ;; 6.1: Equivalence predicates
+   eq? eqv? equal?
+   ;; 6.2: Numbers
+   number? complex? real? rational? integer? exact? inexact?
+   exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
+   negative? max min + * - / quotient remainder modulo abs
+   ;; 6.3: Booleans
+   not boolean? boolean=?
+   ;; 6.4: Pairs and Lists
+   pair? cons car cdr set-car! set-cdr! caar cadr cdar cddr null? list? make-list list
+   length append reverse list-tail list-ref list-set! memq memv member assq assv assoc
+   ;; 6.5: Symbols
+   ;; 6.6: Characters
+   char? char=? char<? char>? char<=? char>=? char-ci=? char-ci<? char-ci>?
+   char-ci<=? char-ci>=? char-alphabetic? char-numeric? char-whitespace?
+   char-upper-case? char-lower-case? digit-value char->integer integer->char
+   char-upcase char-downcase
+   ;; 6.7: Strings
+   string?
+   procedure?
+   ;; 6.13: Input and Output
+   newline write-char write-string write-u8)
   (begin
     ;;; 7.3: Derived expression types
 
@@ -171,12 +178,23 @@
 
     ;;; 6.1: Equivalence predicates
 
+    (define (both pred a b)
+      (and (pred a) (pred b)))
+
     (define (eq? a b)
       (builtin eq? a b))
 
-    ;; TODO
     (define (eqv? a b)
-      (eq? a b))
+      (or (eq? a b)
+          (and (number? a) (number? b) (= a b))))
+
+    (define (equal? a b)
+      (or (eq? a b)
+          (and (both number? a b) (= a b))
+          (and (both pair? a b)
+               (and (equal? (car a) (car b))
+                    (equal? (cdr a) (cdr b))))))
+          ;(and (both string? a b) (string=? a b))))
 
     ;;; 6.2: Numbers
 
@@ -278,6 +296,9 @@
       (or (eq? obj #f)
           (eq? obj #t)))
 
+    (define (boolean=? b1 b2 . rest)
+      (bool-fold eq? b1 (cons b2 rest)))
+
     ;;; 6.4: Pairs and lists
 
     (define (pair? obj)
@@ -291,6 +312,12 @@
 
     (define (cdr obj)
       (builtin cdr obj))
+
+    (define (set-car! pair obj)
+      (builtin set-car! pair obj))
+
+    (define (set-cdr! pair obj)
+      (builtin set-cdr! pair obj))
 
     (define (caar p)
       (car (car p)))
@@ -312,10 +339,10 @@
           (and (pair? obj)
                (list? (cdr obj)))))
 
-    #;(define (make-list n . fill)
+    (define (make-list n . fill)
       (if (eq? n 0)
           '()
-    (cons fill (make-list (- n 1) fill))))
+          (cons fill (make-list (- n 1) fill))))
 
     (define (list . rest)
       rest)
@@ -338,22 +365,116 @@
     (define (reverse lst)
       (reverse-inner lst '()))
 
-    (define (memq obj lst)
+    (define (list-tail x k)
+      (if (zero? k)
+          x
+          (list-tail (cdr x) (- k 1))))
+
+    (define (list-ref l k)
+      (if (zero? k)
+          (car l)
+          (list-tail (cdr l) (- k 1))))
+
+    (define (list-set! l k o)
+      (if (zero? k)
+          (set-car! l o)
+          (list-tail (cdr l) (- k 1))))
+
+    (define (memk obj lst key)
       (cond
        ((null? lst) #f)
-       ((eq? obj (car lst)) lst)
-       (else (memq obj (cdr lst)))))
+       ((key obj (car lst)) lst)
+       (else (memk obj (cdr lst) key))))
+
+    (define (memq obj lst)
+      (memk obj lst eq?))
 
     (define (memv obj lst)
+      (memk obj lst eqv?))
+
+    (define (member obj lst . key)
+      (if (null? key)
+          (memk obj lst equal?)
+          (memk obj lst (car key))))
+
+    (define (assk obj lst key)
       (cond
        ((null? lst) #f)
-       ((eq? obj (car lst)) lst)
-       (else (memq obj (cdr lst)))))
+       ((key obj (caar lst)) (car lst))
+       ( else (assk obj (cdr lst) key))))
+
+    (define (assq obj lst)
+      (assk obj lst eq?))
+
+    (define (assv obj lst)
+      (assk obj lst eqv?))
+
+    (define (assoc obj lst . key)
+      (if (null? key)
+          (assk obj lst equal?)
+          (assk obj lst (car key))))
 
     ;; 6.6: Characters
 
     (define (char? obj)
       (builtin char? obj))
+
+    (define (char=? c1 c2 . rest)
+      (bool-fold (lambda (a b) (= (char->integer a) (char->integer b)))
+                 c1 (cons c2 rest)))
+
+    (define (char<? c1 c2 . rest)
+      (bool-fold (lambda (a b) (< (char->integer a) (char->integer b)))
+                 c1 (cons c2 rest)))
+
+    (define (char>? c1 c2 . rest)
+      (bool-fold (lambda (a b) (> (char->integer a) (char->integer b)))
+                 c1 (cons c2 rest)))
+
+    (define (char<=? c1 c2 . rest)
+      (bool-fold (lambda (a b) (<= (char->integer a) (char->integer b)))
+                 c1 (cons c2 rest)))
+
+    (define (char>=? c1 c2 . rest)
+      (bool-fold (lambda (a b) (>= (char-foldcase (char->integer a))
+                                   (char-foldcase (char->integer b))))
+                 c1 (cons c2 rest)))
+
+    (define (char-ci=? c1 c2 . rest)
+      (bool-fold (lambda (a b) (= (char-foldcase (char->integer a))
+                                  (char-foldcase (char->integer b))))
+                 c1 (cons c2 rest)))
+
+    (define (char-ci<? c1 c2 . rest)
+      (bool-fold (lambda (a b) (< (char-foldcase (char->integer a))
+                                  (char-foldcase (char->integer b))))
+                 c1 (cons c2 rest)))
+
+    (define (char-ci>? c1 c2 . rest)
+      (bool-fold (lambda (a b) (> (char-foldcase (char->integer a))
+                                  (char-foldcase (char->integer b))))
+                 c1 (cons c2 rest)))
+
+    (define (char-ci<=? c1 c2 . rest)
+      (bool-fold (lambda (a b) (<= (char-foldcase (char->integer a))
+                                   (char-foldcase (char->integer b))))
+                 c1 (cons c2 rest)))
+
+    (define (char-ci>=? c1 c2 . rest)
+      (bool-fold (lambda (a b) (>= (char-foldcase (char->integer a))
+                                   (char-foldcase (char->integer b))))
+                 c1 (cons c2 rest)))
+
+    (define char-alphabetic? (ff->scheme bool isalpha (char c)))
+    (define char-numeric? (ff->scheme bool isdigit (char c)))
+    (define char-whitespace? (ff->scheme bool isspace (char c)))
+    (define char-upper-case? (ff->scheme bool isupper (char c)))
+    (define char-lower-case? (ff->scheme bool islower (char c)))
+
+    (define (digit-value ch)
+      (if (and (char>=? ch #\0) (char<=? #\9))
+          (- (char->integer ch) (char->integer #\0))
+          #f))
 
     (define (char->integer obj)
       (builtin char->integer obj))
@@ -361,6 +482,18 @@
     (define (integer->char obj)
       (builtin integer->char obj))
 
+    (define (char-upcase ch)
+      (if (and (char>=? ch #\a) (char<=? #\z))
+          (integer->char (- (char->integer ch) 32))
+          ch))
+
+    (define (char-downcase ch)
+      (if (and (char>=? ch #\A) (char<=? #\Z))
+          (integer->char (+ (char->integer ch) 32))
+          ch))
+
+    (define (char-foldcase ch)
+      (char-downcase ch))
 
     ;; 6.7: Strings
 
