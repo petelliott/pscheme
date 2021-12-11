@@ -12,14 +12,12 @@
    ;; 6.3: Booleans
    not boolean? boolean=?
    ;; 6.4: Pairs and Lists
-   pair? cons car cdr set-car! set-cdr! caar cadr cdar cddr null? list? make-list list
-   length append reverse list-tail list-ref list-set! memq memv member assq assv assoc
+   pair? cons car cdr set-car! set-cdr! caar cadr cdar cddr null? list?
+   make-list list length append reverse list-tail list-ref list-set! memq memv
+   member assq assv assoc
    ;; 6.5: Symbols
    ;; 6.6: Characters
-   char? char=? char<? char>? char<=? char>=? char-ci=? char-ci<? char-ci>?
-   char-ci<=? char-ci>=? char-alphabetic? char-numeric? char-whitespace?
-   char-upper-case? char-lower-case? digit-value char->integer integer->char
-   char-upcase char-downcase
+   char? char=? char<? char>? char<=? char>=? char->integer integer->char
    ;; 6.7: Strings
    string?
    procedure?
@@ -436,64 +434,14 @@
                  c1 (cons c2 rest)))
 
     (define (char>=? c1 c2 . rest)
-      (bool-fold (lambda (a b) (>= (char-foldcase (char->integer a))
-                                   (char-foldcase (char->integer b))))
+      (bool-fold (lambda (a b) (>= (char->integer a) (char->integer b)))
                  c1 (cons c2 rest)))
-
-    (define (char-ci=? c1 c2 . rest)
-      (bool-fold (lambda (a b) (= (char-foldcase (char->integer a))
-                                  (char-foldcase (char->integer b))))
-                 c1 (cons c2 rest)))
-
-    (define (char-ci<? c1 c2 . rest)
-      (bool-fold (lambda (a b) (< (char-foldcase (char->integer a))
-                                  (char-foldcase (char->integer b))))
-                 c1 (cons c2 rest)))
-
-    (define (char-ci>? c1 c2 . rest)
-      (bool-fold (lambda (a b) (> (char-foldcase (char->integer a))
-                                  (char-foldcase (char->integer b))))
-                 c1 (cons c2 rest)))
-
-    (define (char-ci<=? c1 c2 . rest)
-      (bool-fold (lambda (a b) (<= (char-foldcase (char->integer a))
-                                   (char-foldcase (char->integer b))))
-                 c1 (cons c2 rest)))
-
-    (define (char-ci>=? c1 c2 . rest)
-      (bool-fold (lambda (a b) (>= (char-foldcase (char->integer a))
-                                   (char-foldcase (char->integer b))))
-                 c1 (cons c2 rest)))
-
-    (define char-alphabetic? (ff->scheme bool isalpha (char c)))
-    (define char-numeric? (ff->scheme bool isdigit (char c)))
-    (define char-whitespace? (ff->scheme bool isspace (char c)))
-    (define char-upper-case? (ff->scheme bool isupper (char c)))
-    (define char-lower-case? (ff->scheme bool islower (char c)))
-
-    (define (digit-value ch)
-      (if (and (char>=? ch #\0) (char<=? #\9))
-          (- (char->integer ch) (char->integer #\0))
-          #f))
 
     (define (char->integer obj)
       (builtin char->integer obj))
 
     (define (integer->char obj)
       (builtin integer->char obj))
-
-    (define (char-upcase ch)
-      (if (and (char>=? ch #\a) (char<=? #\z))
-          (integer->char (- (char->integer ch) 32))
-          ch))
-
-    (define (char-downcase ch)
-      (if (and (char>=? ch #\A) (char<=? #\Z))
-          (integer->char (+ (char->integer ch) 32))
-          ch))
-
-    (define (char-foldcase ch)
-      (char-downcase ch))
 
     ;; 6.7: Strings
 
