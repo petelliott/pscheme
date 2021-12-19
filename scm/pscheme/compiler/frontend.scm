@@ -18,7 +18,10 @@
       (parent frame-parent))
 
     (define (new-frame args rest-arg parent)
-      (make-frame args rest-arg '() '() parent))
+      (make-frame args rest-arg
+                  (if rest-arg '((#f)) '())
+                  '()
+                  parent))
 
     (define (define-var! sym frame)
       (if (not (null? frame))
@@ -27,7 +30,7 @@
     (define (lookup-var! sym frame)
       (cond
        ((null? frame)                     (lookup-global sym))
-       ((eq? sym (frame-rest-arg frame))  `(stack ,(length (frame-locals frame))))
+       ((eq? sym (frame-rest-arg frame))  '(stack 0))
        ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
        ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
        ((assq sym (frame-closure frame))  (error "this is fake")) ;(assq sym (frame-closure frame)))
@@ -168,9 +171,9 @@
       `(closure
         (lambda ,(cadr form)
           ,@(if (frame-rest-arg new-scope)
-               `((accumulate-rest ,(length (frame-args new-scope)) (stack ,nlocals))
-                 (push-locals ,(+ nlocals 1)))
-               `((push-locals ,nlocals)))
+               `((accumulate-rest ,(length (frame-args new-scope)) (stack 0)))
+               '())
+          (push-locals ,nlocals)
           ,@body)
         ,@(reverse (frame-closure new-scope))))
 
