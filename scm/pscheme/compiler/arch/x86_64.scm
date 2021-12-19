@@ -22,7 +22,7 @@
       (cond
        ((eq? ref 'result) "%rax")
        ((is-syntax? 'stack ref)
-        (format "~a(%rbp)" (- (* (+ (cadr ref) 1) word-size))))
+        (format "~a(%rbp)" (- (* (+ (cadr ref) 2) word-size))))
        ((is-syntax? 'closure ref)
         (format "~a(%rbx)" (* (+ (cadr ref) 1) word-size)))
        ((is-syntax? 'arg ref)
@@ -113,7 +113,7 @@
 ;;; complex syntax operations
 
     (define (if-prologue value key)
-      (format "~a~a    cmpq $~a, ~a\n    je _if_false_~a\n"
+      (format "~a~a    cmpq $~a, ~a\n    je .Lif_false~a\n"
               (ensure-lea-safe value)
               (if (is-syntax? 'immediate value) (mov value 'result) "")
               (tag-number PSCM-S-F PSCM-T-SINGLETON)
@@ -121,10 +121,10 @@
               key))
 
     (define (if-middle key)
-      (format "    jmp _if_end_~a\n_if_false_~a:\n" key key))
+      (format "    jmp .Lif_end~a\n.Lif_false~a:\n" key key))
 
     (define (if-end key)
-      (format "_if_end_~a:\n" key))
+      (format ".Lif_end~a:\n" key))
 
     (define (global-define-slot lib sym)
       (define label (mangle lib sym))
@@ -146,10 +146,11 @@
                               ((#t) PSCM-S-T)) PSCM-T-SINGLETON)))
 
     (define (cons-literal label left right)
-      (format "\n    .data\n    .align 16\n~a:\t.8byte ~a, ~a\n" label (x86-data left) (x86-data right)))
+      (format "\n    .data\n    .type ~a, STT_OBJECT\n    .align 16\n~a:\t.8byte ~a, ~a\n"
+              label label (x86-data left) (x86-data right)))
 
     (define (string-literal label value)
-      (format "\n    .data\n    .align 16\n~a:\t.asciz ~s\n" label value))
+      (format "\n    .data\n    .type ~a, STT_OBJECT\n    .align 16\n~a:\t.asciz ~s\n" label label value))
 
     (define (tag-label label tag)
       (format "(~a + ~a)" label
@@ -170,15 +171,15 @@
 
 ;;; pscheme calling convention
     (define (prologue label)
-      (format "\n    .text\n~a:\n    push %rbx\n    mov 8(%r13), %rbx\n    shr $4, %rbx\n    shl $4, %rbx\n    push %rbp\n    mov %rsp, %rbp\n"
-              label))
+      (format "\n    .text\n    .type ~a, STT_FUNC\n~a:\n    push %rbp\n    mov %rsp, %rbp\n    push %rbx\n    mov 8(%r13), %rbx\n    shr $4, %rbx\n    shl $4, %rbx\n"
+              label label))
 
     (define (accumulate-rest nregular ref)
       (format "    mov $~a, %rdi\n    call pscm_internal_rest\n    mov %rax, ~a\n"
               nregular (x86-arg ref)))
 
     (define (epilogue)
-      "    mov %rbp, %rsp\n    pop %rbp\n    pop %rbx\n    ret\n")
+      "    mov -8(%rbp), %rbx\n    mov %rbp, %rsp\n    pop %rbp\n    ret\n")
 
     (define (prepare fn)
       (format "~a    push ~a\n    push %r13\n"
@@ -219,7 +220,7 @@
         (error "builtin: wrong number of args" args)))
 
     (define (builtin-cmp args inst)
-      (define cmp-label (genlabel "cmp"))
+      (define cmp-label (genlabel ".Lcmp"))
       (assert-nargs args = 2)
       (format "~a~a    mov $~a, %rax\n    cmpq %r8, %rcx\n    ~a ~a\n    mov $~a, %rax\n~a:\n"
               (mov (cadr args) "%r8")
@@ -229,7 +230,7 @@
               cmp-label (singleton-literal #f) cmp-label))
 
     (define (builtin-typep args tag)
-      (define label (genlabel "typep"))
+      (define label (genlabel ".Ltypep"))
       (assert-nargs args = 1)
       (format "~a    mov $~a, %rax\n    and $0xf, %rcx\n    cmp $~a, %rcx\n    je ~a\n    mov $~a, %rax\n~a:\n"
               (mov (car args) "%rcx")
