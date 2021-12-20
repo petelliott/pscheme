@@ -20,7 +20,8 @@
    char? char=? char<? char>? char<=? char>=? char->integer integer->char
    ;; 6.7: Strings
    string? make-string string-length string-ref string-set! string=? string<?
-   string>? string<=? string>=? substring string-append string-copy string-copy!
+   string>? string<=? string>=? substring string-append list->string
+   string->list string-copy string-copy!
    ;; 6.8: Vectors
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
@@ -508,7 +509,7 @@
              (append-length (cdr l)))))
 
     (define (string-append . strings)
-      (define new (make-string (append-length strings) #\f))
+      (define new (make-string (append-length strings)))
       (define off 0)
       (for-each (lambda (string)
                   (define l (string-length string))
@@ -516,6 +517,28 @@
                   (set! off (+ off l)))
                 strings)
       new)
+
+    (define (string->list-inner string start end)
+      (if (>= start end)
+          '()
+          (cons (string-ref string start)
+                (string->list-inner string (+ start 1) end))))
+
+    (define (string->list string . args)
+      (case (length args)
+        ((0) (string->list-inner string 0 (string-length string)))
+        ((1) (string->list-inner string (car args) (string-length string)))
+        ((2) (string->list-inner string (car args) (cadr args)))))
+
+    (define (list->string-inner i list string)
+      (unless (null? list)
+        (string-set! string i (car list))
+        (list->string-inner (+ i 1) (cdr list) string)))
+
+    (define (list->string list)
+      (define string (make-string (length list)))
+      (list->string-inner 0 list string)
+      string)
 
     (define (string-copy string . args)
       (case (length args)
