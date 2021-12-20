@@ -19,8 +19,12 @@
    ;; 6.6: Characters
    char? char=? char<? char>? char<=? char>=? char->integer integer->char
    ;; 6.7: Strings
-   string?
-   procedure?
+   string? make-string string-length string-ref string-set! string=? string<?
+   string>? string<=? string>=? substring string-append string-copy string-copy!
+   ;; 6.8: Vectors
+   ;; 6.9: Bytevectors
+   ;; 6.10: Control features
+   procedure? for-each
    ;; 6.13: Input and Output
    newline write-char write-string write-u8)
   (begin
@@ -70,7 +74,7 @@
          (begin result1 result2 ...))
         ((case key
            ((atoms ...) result1 result2 ...))
-         (if (memv key ’(atoms ...))
+         (if (memv key '(atoms ...))
              (begin result1 result2 ...)))
         ((case key
            ((atoms ...) => result))
@@ -191,8 +195,8 @@
           (and (both number? a b) (= a b))
           (and (both pair? a b)
                (and (equal? (car a) (car b))
-                    (equal? (cdr a) (cdr b))))))
-          ;(and (both string? a b) (string=? a b))))
+                    (equal? (cdr a) (cdr b))))
+          (and (both string? a b) (string=? a b))))
 
     ;;; 6.2: Numbers
 
@@ -445,8 +449,93 @@
 
     ;; 6.7: Strings
 
+    ;; some string.h functions that we use
+    (define memset (ff->scheme void memset (char* dst) (char c) (int n)))
+    (define strlen (ff->scheme int strlen (char* str)))
+    (define strcmp (ff->scheme int strcmp (char* s1) (char* s2)))
+
     (define (string? obj)
       (builtin string? obj))
+
+    (define (make-string k . fill)
+      (define str (builtin alloc-string (+ k 1)))
+      (string-set! str k #\null)
+      (unless (null? fill)
+        (memset str (car fill) k))
+      str)
+
+    (define (string-length string)
+      (strlen string))
+
+    (define (string-ref string k)
+      (builtin string-ref string k))
+
+    (define (string-set! string k char)
+      (builtin string-set! string k char)
+      (begin))
+
+    (define (string=? s1 s2 . rest)
+      (bool-fold (lambda (a b) (= (strcmp a b) 0))
+                 s1 (cons s2 rest)))
+
+    (define (string<? s1 s2 . rest)
+      (bool-fold (lambda (a b) (< (strcmp a b) 0))
+                 s1 (cons s2 rest)))
+
+    (define (string>? s1 s2 . rest)
+      (bool-fold (lambda (a b) (> (strcmp a b) 0))
+                 s1 (cons s2 rest)))
+
+    (define (string<=? s1 s2 . rest)
+      (bool-fold (lambda (a b) (<= (strcmp a b) 0))
+                 s1 (cons s2 rest)))
+
+    (define (string>=? s1 s2 . rest)
+      (bool-fold (lambda (a b) (>= (strcmp a b) 0))
+                 s1 (cons s2 rest)))
+
+    (define (substring string start end)
+      (define length (- end start))
+      (define new (make-string length))
+      (builtin strcpy new string length 0 start)
+      new)
+
+    ; TODO: write fold
+    (define (append-length l)
+      (if (null? l)
+          0
+          (+ (string-length (car l))
+             (append-length (cdr l)))))
+
+    (define (string-append . strings)
+      (define new (make-string (append-length strings) #\f))
+      (define off 0)
+      (for-each (lambda (string)
+                  (define l (string-length string))
+                  (builtin strcpy new string l off 0)
+                  (set! off (+ off l)))
+                strings)
+      new)
+
+    (define (string-copy string . args)
+      (case (length args)
+        ((0) (substring string 0 (string-length string)))
+        ((1) (substring string (car args) (string-length string)))
+        ((2) (substring string (car args) (cadr args)))))
+
+    (define (string-copy! to at from . args)
+      (define len
+        (case (length args)
+          ((0) (string-length from))
+          ((1) (- (string-length from) (car args)))
+          ((2) (- (cadr args) (car args)))))
+      (define start
+        (case (length args)
+          ((0) 0)
+          ((1 2) (car args))))
+      (builtin strcpy to from len at start))
+
+    ;; TODO: string-fill!
 
     ;; 6.8: Vectors
     ;; 6.9: Byte Vectors
@@ -455,6 +544,11 @@
     (define (procedure? obj)
       (builtin procedure? obj))
 
+    ;; TODO: take more than one list
+    (define (for-each proc list)
+      (unless (null? list)
+        (proc (car list))
+        (for-each proc (cdr list))))
 
     ;; 6.13: Input and Output
 

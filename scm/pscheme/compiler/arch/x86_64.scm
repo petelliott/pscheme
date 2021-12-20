@@ -272,6 +272,36 @@
               off
               (mov 'unspecified 'result)))
 
+    (define (builtin-alloc args tag)
+      (assert-nargs args = 1)
+      (format "~a    shr $4, %rdi\n     shr $4, %rdi\n    call pscheme_allocate_block\n    or $~a, %rax\n"
+              (mov (car args) "%rdi")
+              tag))
+
+    (define (builtin-string-ref args)
+      (assert-nargs args = 2)
+      (format "~a~a    shr $4, %rcx\n    shl $4, %rcx\n    sar $4, %rax\n    movb (%rcx, %rax, 1), %al\n    shl $4, %rax\n    or $~a, %rax\n"
+              (mov (car args) "%rcx")
+              (mov (cadr args) 'result)
+              PSCM-T-CHAR))
+
+    (define (builtin-string-set args)
+      (assert-nargs args = 3)
+      (format "~a~a~a    shr $4, %rdx\n    shl $4, %rdx\n    sar $4, %rcx\n    sar $4, %rax\n    movb %al, (%rdx, %rcx, 1)\n"
+              (mov (car args) "%rdx")
+              (mov (cadr args) "%rcx")
+              (mov (caddr args) 'result)))
+
+    ;; (builtin strcpy dest src length startd starts)
+    (define (builtin-strcpy args)
+      (assert-nargs args = 5)
+      (format "~a~a~a~a~a    shr $4, %rdi\n    shl $4, %rdi\n    shr $4, %rsi\n    shl $4, %rsi\n    sar $4, %rdx\n    sar $4, %rcx\n    sar $4, %rax\n    add %rcx, %rdi\n    add %rax, %rsi\n    call memmove\n"
+              (mov (car args) "%rdi")       ; dest
+              (mov (cadr args) "%rsi")      ; src
+              (mov (caddr args) "%rdx")     ; length
+              (mov (cadddr args) "%rcx")    ; startd
+              (mov (car (cddddr args)) 'result))) ; starts
+
     (define (builtin-ptr->ffi args)
       (assert-nargs args = 1)
       (format "~a    shr $4, %rax\n    shl $4, %rax\n"
@@ -331,6 +361,10 @@
         (cdr . ,(lambda (args) (builtin-car/cdr args 8)))
         (set-car! . ,(lambda (args) (builtin-set-car/cdr! args 0)))
         (set-cdr! . ,(lambda (args) (builtin-set-car/cdr! args 8)))
+        (alloc-string . ,(lambda (args) (builtin-alloc args PSCM-T-STRING)))
+        (string-ref . ,builtin-string-ref)
+        (string-set! . ,builtin-string-set)
+        (strcpy . ,builtin-strcpy)
         (fixnum->ffi . ,builtin-num->ffi)
         (string->ffi . ,builtin-ptr->ffi)
         (char->ffi . ,builtin-num->ffi)
