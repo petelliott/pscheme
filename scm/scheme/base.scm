@@ -25,7 +25,7 @@
    ;; 6.8: Vectors
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
-   procedure? apply for-each
+   procedure? apply map for-each
    ;; 6.13: Input and Output
    newline write-char write-string write-u8)
   (begin
@@ -572,14 +572,46 @@
           (car args)
           (cons (car args) (process-apply-args (cdr args)))))
 
-    (define (apply fn . args)
-      (builtin apply fn (process-apply-args args)))
+    (define (apply proc . args)
+      (builtin apply proc (process-apply-args args)))
 
-    ;; TODO: take more than one list
-    (define (for-each proc list)
+    (define (any-null? list)
+      (if (null? list)
+          #f
+          (or (null? (car list))
+              (any-null? (cdr list)))))
+
+    (define (map1 proc list)
+      (if (null? list)
+          '()
+          (cons (proc (car list))
+                (map1 proc (cdr list)))))
+
+    (define (map-inner proc lists)
+      (if (any-null? lists)
+          '()
+          (cons (apply proc (map1 car lists))
+                (map-inner proc (map1 cdr lists)))))
+
+    (define (map proc list1 . lists)
+      (if (null? lists)
+          (map1 proc list1) ; fast path
+          (map-inner proc (cons list1 lists))))
+
+    (define (for-each1 proc list)
       (unless (null? list)
         (proc (car list))
-        (for-each proc (cdr list))))
+        (for-each1 proc (cdr list))))
+
+    (define (for-each-inner proc lists)
+      (unless (any-null? lists)
+        (apply proc (map1 car lists))
+        (for-each-inner proc (map1 cdr lists))))
+
+    (define (for-each proc list1 . lists)
+      (if (null? lists)
+          (for-each1 proc list1)
+          (for-each-inner proc (cons list1 lists))))
 
     ;; 6.13: Input and Output
 
