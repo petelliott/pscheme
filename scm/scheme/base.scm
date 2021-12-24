@@ -25,7 +25,7 @@
    ;; 6.8: Vectors
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
-   procedure? for-each
+   procedure? apply for-each
    ;; 6.13: Input and Output
    newline write-char write-string write-u8)
   (begin
@@ -566,6 +566,14 @@
 
     (define (procedure? obj)
       (builtin procedure? obj))
+
+    (define (process-apply-args args)
+      (if (null? (cdr args))
+          (car args)
+          (cons (car args) (process-apply-args (cdr args)))))
+
+    (define (apply fn . args)
+      (builtin apply fn (process-apply-args args)))
 
     ;; TODO: take more than one list
     (define (for-each proc list)

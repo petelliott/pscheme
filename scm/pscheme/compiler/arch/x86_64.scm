@@ -342,6 +342,16 @@
               (mov (car args) 'result)
               tag))
 
+    (define (builtin-apply args)
+      (define loop (genlabel ".Lapply"))
+      (define end (genlabel ".Lapply_end"))
+      (assert-nargs args = 2)
+      (format "~a~a    push %r13\n    mov %rsp, %r13\n~a:\n    mov %rax, %rdx\n    and $0xf, %rdx\n    cmp $~a, %rdx\n    jne ~a\n    shr $4, %rax\n    shl $4, %rax\n    pushq 0(%rax)\n    mov 8(%rax), %rax\n    jmp ~a\n~a:\n    shr $4, %rcx\n    shl $4, %rcx\n    call *(%rcx)\n    mov %r13, %rsp\n    pop %r13\n"
+              (mov (car args) "%rcx")
+              (mov (cadr args) 'result)
+              loop PSCM-T-CONS end loop end))
+
+
     (define builtins
       `((eq? . ,(lambda (args) (builtin-cmp args "je")))
         (fixnum< . ,(lambda (args) (builtin-cmp args "jl")))
@@ -372,7 +382,8 @@
         (ffi->char . ,(lambda (args) (builtin-ffi->num args PSCM-T-CHAR)))
         (ffi-call . ,builtin-ffi-call)
         (integer->char . ,(lambda (args) (builtin-retag args PSCM-T-CHAR)))
-        (char->integer . ,(lambda (args) (builtin-retag args PSCM-T-FIXNUM)))))
+        (char->integer . ,(lambda (args) (builtin-retag args PSCM-T-FIXNUM)))
+        (apply . ,builtin-apply)))
 
     (define (builtin op nargs)
       ((cdr (assoc op builtins)) nargs))
