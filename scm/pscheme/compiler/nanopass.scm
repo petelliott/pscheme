@@ -97,6 +97,8 @@
 (define (result-map proc forml)
   (cond
    ((null? forml) '())
+   ((not (pair? forml))
+    (proc forml))
    ((proc (car forml)) =>
     (lambda (parsed)
       (cons parsed
@@ -143,6 +145,15 @@
       (parse-terminal alt form)
       (parse-nonterminal l alt form)))
 
+(define (spliced-map proc lst)
+  (cond
+   ((null? lst) '())
+   ((symbol? (car lst))
+    (proc lst))
+   (else
+    (cons (proc (car lst))
+          (spliced-map proc (cdr lst))))))
+
 (define (language-unparse parsed)
   (define forms (cddr parsed))
   (define (nonterminal pat)
@@ -150,7 +161,7 @@
     (cond
      ((is-splicing? pat)
       (set! forms (cdr forms))
-      (map language-unparse child))
+      (spliced-map language-unparse child))
      ((is-syntax? 'unquote pat)
       (set! forms (cdr forms))
       (language-unparse child))
