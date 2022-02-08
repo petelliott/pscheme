@@ -115,10 +115,10 @@
     (cond
      ((is-splicing? clause)
       (result->list (result-map (lambda (f)
-                                  (language-parse l (cadar clause) f))
+                                  (language-parse l f (cadar clause)))
                                 form)))
      ((is-syntax? 'unquote clause)
-      (result->list (language-parse l (cadr clause) form)))
+      (result->list (language-parse l form (cadr clause))))
      ((and (pair? clause) (pair? form))
       (merge-results (inner (car clause) (car form))
                      (inner (cdr clause) (cdr form))))
@@ -137,13 +137,25 @@
      (else (inner (cdr clauses) form))))
   (inner (cdr nt) form))
 
-(define (language-parse l alt-name form)
+(define (default-alternative l)
+  (if (terminal? (car l))
+      (default-alternative (cdr l))
+      (caar l)))
+
+(define (language-parse l form . rest)
+  (define alt-name (or (and (pair? rest) (car rest))
+                       (default-alternative l)))
+
   (define alt (assoc alt-name l))
   (unless alt
     (error "can't find alternative" alt-name))
   (if (terminal? alt)
       (parse-terminal alt form)
       (parse-nonterminal l alt form)))
+
+(define (is-nested? lst)
+  (and (pair? lst)
+       (pair? (car lst))))
 
 (define (spliced-map proc lst)
   (cond
@@ -154,17 +166,17 @@
     (cons (proc (car lst))
           (spliced-map proc (cdr lst))))))
 
-(define (language-unparse parsed)
+(define (language-unparse1 parsed proc)
   (define forms (cddr parsed))
   (define (nonterminal pat)
     (define child (and (pair? forms) (car forms)))
     (cond
      ((is-splicing? pat)
       (set! forms (cdr forms))
-      (spliced-map language-unparse child))
+      (spliced-map proc child))
      ((is-syntax? 'unquote pat)
       (set! forms (cdr forms))
-      (language-unparse child))
+      (proc child))
      ((pair? pat)
       (cons (nonterminal (car pat))
             (nonterminal (cdr pat))))
@@ -172,6 +184,65 @@
   (if (procedure? (cadr parsed))
       (caddr parsed)
       (nonterminal (cadr parsed))))
+
+(define (language-unparse parsed)
+  (language-unparse1 parsed language-unparse))
+
+;; passes
+
+(define (nested-map proc l)
+  (cond
+   ((null? l) '())
+   ((is-nested? (car l))
+    (cons (spliced-map proc (car l))
+          (nested-map proc (cdr l))))
+   (else
+    (cons (proc (car l))
+          (nested-map proc (cdr l))))))
+
+(define-syntax pass-cases
+  (syntax-rules ()
+    ((_ rec parsed ())
+     (language-unparse1 parsed rec))
+    ((_ rec parsed ((form vars body ...) rest ...))
+     (if (equal? 'form (cadr parsed))
+         (apply (lambda vars body ...) (nested-map rec (cddr parsed)))
+         (pass-cases rec parsed (rest ...))))))
+
+(define-syntax pass-rules
+  (syntax-rules ($)
+    ((_ rec parsed ())
+     (language-unparse1 parsed rec))
+    ((_ rec parsed (($ term vars body ...) rest ...))
+     (if (equal? 'term (car parsed))
+         ((lambda vars body ...) (caddr parsed))
+         (pass-rules rec parsed (rest ...))))
+    ((_ rec parsed ((nonterm cases ...) rest ...))
+     (if (equal? 'nonterm (car parsed))
+         (pass-cases rec parsed (cases ...))
+         (pass-rules rec parsed (rest ...))))))
+
+(define-syntax pass
+  (syntax-rules ()
+    ((_ (l0) rules ...)
+     (lambda (form)
+       (letrec ((parsed (language-parse l0 form))
+                (rec (lambda (form)
+                       (pass-rules rec form (rules ...)))))
+         (rec parsed))))))
+
+(define-syntax define-pass
+  (syntax-rules ()
+    ((_ name (l0) rules ...)
+     (define name (pass (l0) rules ...)))))
+
+(define (concat-passes passes)
+  (lambda (form)
+    (define (inner p f)
+      (if (null? p)
+          f
+          (inner (cdr p) ((car p) f))))
+    (inner passes form)))
 
 ;; TESTING
 
@@ -198,5 +269,13 @@
     (if ,expr ,expr)
     (set! ,var ,expr)
     (lambda (,@var) ,@stmt)
+    (,expr ,@expr)
     ,var
     ,literal)))
+
+(define-pass p1 (lscheme)
+  ($ literal (l)
+     #t)
+  (stmt
+   ((define (,var ,@var) ,@stmt) [name args body]
+    `(define ,name (lambda (,@args) ,@body)))))
