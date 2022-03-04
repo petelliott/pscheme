@@ -27,10 +27,11 @@ static inline uintptr_t unum(pscheme_t obj) { return obj >> 4; }
 static inline intptr_t num(pscheme_t obj) { return (intptr_t)(sra(obj, 4)); }
 static inline uintptr_t tag(pscheme_t obj) { return obj & 0xf; }
 
+
 struct pscheme_cons_cell {
     pscheme_t car;
     pscheme_t cdr;
-};
+} __attribute__ ((aligned (16)));
 
 pscheme_t pscheme_cons(pscheme_t a, pscheme_t b);
 pscheme_t pscheme_car(pscheme_t obj);
