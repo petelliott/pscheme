@@ -160,9 +160,9 @@
       (unless alt
         (error "can't find alternative" alt-name))
       (let ((hooked-form (hook form)))
-      (if (terminal? alt)
-          (parse-terminal alt hooked-form)
-          (parse-nonterminal l alt hooked-form hook))))
+        (if (terminal? alt)
+            (parse-terminal alt hooked-form)
+            (parse-nonterminal l alt hooked-form hook))))
 
     (define (language-parse l form . rest)
       (apply language-parse-hook l form (lambda (f) f) rest))

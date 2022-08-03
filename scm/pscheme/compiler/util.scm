@@ -4,7 +4,8 @@
           (srfi-28))
   (export is-syntax?
           mangle
-          mangle-library)
+          mangle-library
+          any?)
   (begin
 
     (define (is-syntax? sym form)
@@ -40,6 +41,7 @@
                      "$$"
                      (sanitize-chars (symbol->string sym))))
 
-
+    (define (any? form)
+      #t)
 
     ))
