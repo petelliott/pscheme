@@ -20,17 +20,15 @@
        (unquoted-literal unquoted-literal?)
        (any any?)
        ;; non-terminals
-       (program-or-library
-        (,@program-toplevel)
-        (,library))
        (program-toplevel
+        (begin ,@program-toplevel)
+        ,library
         ,proc-toplevel
-        ,import
-        (begin ,@program-toplevel))
+        ,import-declaration)
        (proc-toplevel
+        (begin ,@proc-toplevel)
         ,expression
-        ,definition
-        (begin ,@proc-toplevel))
+        ,definition)
        (definition
          (define ,identifier ,expression)
          (define (,identifier ,@identifier) ,@command-or-definition))
