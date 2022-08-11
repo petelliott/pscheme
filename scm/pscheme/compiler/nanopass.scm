@@ -5,8 +5,8 @@
           (srfi 1))
   (export language
           edit-language
+          language-lazy-parse
           language-parse
-          language-parse-hooked
           language-unparse
           pass
           define-pass
@@ -84,12 +84,37 @@
         ((_ l0 (- transform ...) rest ...)
          (edit-language (language-del l0 (language transform ...)) rest ...))))
 
+    ;; lazy parsing primitives
+
+    (define-syntax lazy
+      (syntax-rules ()
+        ((_ f e) (cons f (lambda () e)))))
+
+    (define (cont-parse lazy)
+      ((cdr lazy)))
+
+    (define (dont-parse lazy)
+      (car lazy))
+
+    (define (is-lazy? form)
+      (and (pair? form)
+           (procedure? (cdr form))))
+
+    (define (force-parsed parsed)
+      (cond
+       ((is-lazy? parsed) (force-parsed (cont-parse parsed)))
+       ((procedure? (cadr parsed)) parsed)
+       (else
+        (mcons (car parsed)
+               (cadr parsed)
+               (nested-map force-parsed (cddr parsed))))))
+
     ;; parsing and unparsing
 
     (define (parse-terminal term form)
       (if ((cadr term) form)
           `(,@term ,form)
-          #f))
+          (error "got someting other than" term form)))
 
     (define-syntax merge-results
       (syntax-rules ()
@@ -121,15 +146,15 @@
            (pair? (car clause))
            (eq? (caar clause) 'unquote-splicing)))
 
-    (define (parse-clause l nt clause form hook)
+    (define (parse-clause l nt clause form)
       (define (inner clause form)
         (cond
          ((is-splicing? clause)
-          (result->list (result-map (lambda (f)
-                                      (language-parse-hook l f hook (cadar clause)))
-                                    form)))
+          (list (result-map (lambda (f)
+                              (language-lazy-parse l f (cadar clause)))
+                            form)))
          ((is-syntax? 'unquote clause)
-          (result->list (language-parse-hook l form hook (cadr clause))))
+          (list (language-lazy-parse l form (cadr clause))))
          ((and (pair? clause) (pair? form))
           (merge-results (inner (car clause) (car form))
                          (inner (cdr clause) (cdr form))))
@@ -140,11 +165,11 @@
           `(,nt ,clause ,@result)
           #f))
 
-    (define (parse-nonterminal l nt form hook)
+    (define (parse-nonterminal l nt form)
       (define (inner clauses form)
         (cond
-         ((null? clauses) #f)
-         ((parse-clause l (car nt) (car clauses) form hook))
+         ((null? clauses) (error "couldn't match nt" nt form))
+         ((parse-clause l (car nt) (car clauses) form))
          (else (inner (cdr clauses) form))))
       (inner (cdr nt) form))
 
@@ -153,19 +178,18 @@
           (default-alternative (cdr l))
           (caar l)))
 
-    (define (language-parse-hook l form hook . rest)
+    (define (language-lazy-parse l form . rest)
       (define alt-name (or (and (pair? rest) (car rest))
                            (default-alternative l)))
       (define alt (assoc alt-name l))
       (unless alt
         (error "can't find alternative" alt-name))
-      (let ((hooked-form (hook form)))
-        (if (terminal? alt)
-            (parse-terminal alt hooked-form)
-            (parse-nonterminal l alt hooked-form hook))))
+      (if (terminal? alt)
+          (lazy form (parse-terminal alt form))
+          (lazy form (parse-nonterminal l alt form))))
 
     (define (language-parse l form . rest)
-      (apply language-parse-hook l form (lambda (f) f) rest))
+      (force-parsed (apply language-lazy-parse l form rest)))
 
     (define (is-nested? lst)
       (and (pair? lst)
@@ -179,6 +203,16 @@
        (else
         (cons (proc (car lst))
               (spliced-map proc (cdr lst))))))
+
+    (define (nested-map proc l)
+      (cond
+       ((null? l) '())
+       ((is-nested? (car l))
+        (cons (spliced-map proc (car l))
+              (nested-map proc (cdr l))))
+       (else
+        (cons (proc (car l))
+              (nested-map proc (cdr l))))))
 
     (define (language-unparse1 parsed proc)
       (define forms (cddr parsed))
@@ -200,19 +234,9 @@
           (nonterminal (cadr parsed))))
 
     (define (language-unparse parsed)
-      (language-unparse1 parsed language-unparse))
+      (language-unparse1 (force-parsed parsed) language-unparse))
 
     ;; passes
-
-    (define (nested-map proc l)
-      (cond
-       ((null? l) '())
-       ((is-nested? (car l))
-        (cons (spliced-map proc (car l))
-              (nested-map proc (cdr l))))
-       (else
-        (cons (proc (car l))
-              (nested-map proc (cdr l))))))
 
     (define-syntax pass-cases
       (syntax-rules ()

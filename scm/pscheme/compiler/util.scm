@@ -5,7 +5,8 @@
   (export is-syntax?
           mangle
           mangle-library
-          any?)
+          any?
+          mcons)
   (begin
 
     (define (is-syntax? sym form)
@@ -43,5 +44,10 @@
 
     (define (any? form)
       #t)
+
+    (define (mcons . rest)
+      (if (null? (cdr rest))
+          (car rest)
+          (cons (car rest) (apply mcons (cdr rest)))))
 
     ))
