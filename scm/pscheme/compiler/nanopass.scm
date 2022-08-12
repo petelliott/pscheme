@@ -1,6 +1,7 @@
 (define-library (pscheme compiler nanopass)
   (import (scheme base)
           (scheme cxr)
+          (scheme write)
           (pscheme compiler util)
           (srfi 1))
   (export language
@@ -154,7 +155,10 @@
                               (language-lazy-parse l f (cadar clause)))
                             form)))
          ((is-syntax? 'unquote clause)
-          (list (language-lazy-parse l form (cadr clause))))
+          (let ((alt (assoc (cadr clause) l)))
+            (if (and (terminal? alt) (not ((cadr alt) form)))
+                #f
+                (list (language-lazy-parse l form (cadr clause))))))
          ((and (pair? clause) (pair? form))
           (merge-results (inner (car clause) (car form))
                          (inner (cdr clause) (cdr form))))
@@ -179,6 +183,8 @@
           (caar l)))
 
     (define (language-lazy-parse l form . rest)
+      (define a (write rest))
+      (define b (newline))
       (define alt-name (or (and (pair? rest) (car rest))
                            (default-alternative l)))
       (define alt (assoc alt-name l))

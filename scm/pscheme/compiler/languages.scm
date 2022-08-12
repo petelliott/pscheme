@@ -17,23 +17,19 @@
        ;; terminals
        (identifier symbol?)
        (number number?)
-       (unquoted-literal unquoted-literal?)
+       (literal unquoted-literal?)
        (any any?)
        ;; non-terminals
        (program-toplevel
         (begin ,@program-toplevel)
-        ,library
-        ,proc-toplevel
-        ,import-declaration)
+        (define-library ,library-name ,@library-declaration)
+        (import ,@library-name)
+        ,proc-toplevel)
        (proc-toplevel
         (begin ,@proc-toplevel)
-        ,expression
-        ,definition)
-       (definition
-         (define ,identifier ,expression)
-         (define (,identifier ,@identifier) ,@command-or-definition))
-       (library
-           (define-library ,library-name ,@library-declaration))
+        (define ,identifier ,expression)
+        (define (,identifier ,@identifier) ,@proc-toplevel)
+        ,expression)
        (library-name
         (,@library-name-part))
        (library-name-part
@@ -41,23 +37,16 @@
         ,number)
        (library-declaration
         (export ,@identifier)
-        ,import-declaration
+        (import ,@library-name)
         (begin ,@program-toplevel))
-       (import-declaration
-        (import ,@library-name))
        (expression
-        ,identifier
-        ,literal
-        (lambda ,formals ,@proc-toplevel)
+        (lambda (,@identifier) ,@proc-toplevel)
         (if ,expression ,expression ,expression)
         (if ,expression ,expression)
         (set! ,identifier ,expression)
-        (,expression ,@expression)) ;; procedure call
-       (formals
-        ,identifier
-        (,@identifier))
-       (literal
         (quote ,any)
-        ,unquoted-literal)))
+        (,expression ,@expression) ;; procedure call
+        ,identifier
+        ,literal)))
 
     ))
