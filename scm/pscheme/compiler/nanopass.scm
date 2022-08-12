@@ -107,7 +107,7 @@
        (else
         (mcons (car parsed)
                (cadr parsed)
-               (nested-map force-parsed (cddr parsed))))))
+               (nested-map-lazy force-parsed (cddr parsed))))))
 
     ;; parsing and unparsing
 
@@ -191,6 +191,8 @@
     (define (language-parse l form . rest)
       (force-parsed (apply language-lazy-parse l form rest)))
 
+    ;; helper functions for traversing argument lists
+
     (define (is-nested? lst)
       (and (pair? lst)
            (pair? (car lst))))
@@ -214,6 +216,29 @@
         (cons (proc (car l))
               (nested-map proc (cdr l))))))
 
+    (define (is-nested-lazy? lst)
+      (and (pair? lst)
+           (is-lazy? (car lst))))
+
+    (define (spliced-map-lazy proc lst)
+      (cond
+       ((null? lst) '())
+       ((is-lazy? lst)
+        (proc lst))
+       (else
+        (cons (proc (car lst))
+              (spliced-map proc (cdr lst))))))
+
+    (define (nested-map-lazy proc l)
+      (cond
+       ((null? l) '())
+       ((is-nested-lazy? (car l))
+        (cons (spliced-map-lazy proc (car l))
+              (nested-map-lazy proc (cdr l))))
+       (else
+        (cons (proc (car l))
+              (nested-map-lazy proc (cdr l))))))
+
     (define (language-unparse1 parsed proc)
       (define forms (cddr parsed))
       (define (nonterminal pat)
@@ -230,7 +255,7 @@
                 (nonterminal (cdr pat))))
          (else pat)))
       (if (procedure? (cadr parsed))
-          (caddr parsed)
+          (lambda () (caddr parsed))
           (nonterminal (cadr parsed))))
 
     (define (language-unparse parsed)
@@ -238,19 +263,34 @@
 
     ;; passes
 
+    (define (flatten-list-args args)
+      (sloppy-map
+       (lambda (args)
+         (if (pair? args)
+             (let ((raw (sloppy-map (lambda (f) (f 'raw)) args)))
+               (lambda rest
+                 (cond
+                  ((null? rest)
+                   (sloppy-map (lambda (f) (f)) args))
+                  ((eq? (car rest) 'raw)
+                   raw)
+                  (else (error "unexpected arguments to pass recursion:" rest)))))
+             args))
+       args))
+
     (define-syntax pass-cases
       (syntax-rules ()
         ((_ rec parsed ())
-         (language-unparse1 parsed rec))
+         ((language-unparse1 parsed rec)))
         ((_ rec parsed ((form vars body ...) rest ...))
          (if (equal? 'form (cadr parsed))
-             (apply (lambda vars body ...) (nested-map rec (cddr parsed)))
+             (apply (lambda vars body ...) (flatten-list-args (nested-map-lazy rec (cddr parsed))))
              (pass-cases rec parsed (rest ...))))))
 
     (define-syntax pass-rules
       (syntax-rules ($)
         ((_ rec parsed ())
-         (language-unparse1 parsed rec))
+         ((language-unparse1 parsed rec)))
         ((_ rec parsed (($ term vars body ...) rest ...))
          (if (equal? 'term (car parsed))
              ((lambda vars body ...) (caddr parsed))
@@ -264,10 +304,16 @@
       (syntax-rules ()
         ((_ (l0) rules ...)
          (lambda (form)
-           (letrec ((parsed (language-parse l0 form))
-                    (rec (lambda (form)
-                           (pass-rules rec form (rules ...)))))
-             (rec parsed))))))
+           (letrec ((parsed (language-lazy-parse l0 form))
+                    (rec (lambda (lazy-form)
+                           (lambda rest
+                             (cond
+                              ((null? rest)
+                               (pass-rules rec (cont-parse lazy-form) (rules ...)))
+                              ((eq? (car rest) 'raw)
+                               (dont-parse lazy-form))
+                              (else (error "unexpected arguments to pass recursion:" rest)))))))
+             ((rec parsed)))))))
 
     (define-syntax define-pass
       (syntax-rules ()

@@ -6,7 +6,8 @@
           mangle
           mangle-library
           any?
-          mcons)
+          mcons
+          sloppy-map)
   (begin
 
     (define (is-syntax? sym form)
@@ -49,5 +50,13 @@
       (if (null? (cdr rest))
           (car rest)
           (cons (car rest) (apply mcons (cdr rest)))))
+
+    (define (sloppy-map proc lst)
+      (cond
+       ((null? lst) '())
+       ((not (pair? lst)) (proc lst))
+       (else
+        (cons (proc (car lst))
+              (sloppy-map proc (cdr lst))))))
 
     ))
