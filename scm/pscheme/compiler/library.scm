@@ -34,7 +34,7 @@
       (set-library-imports! to-lib (cons import-lib (library-imports to-lib))))
 
     (define (add-library-export! to-lib export)
-      (set-library-exports! to-lib (cons export (library-exports export))))
+      (set-library-exports! to-lib (cons export (library-exports to-lib))))
 
     (define (add-library-syntax! lib name syntax)
       (set-library-syntax! lib (cons (cons name syntax) (library-syntax lib))))

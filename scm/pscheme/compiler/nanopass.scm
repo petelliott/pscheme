@@ -198,7 +198,7 @@
     (define (parse-nonterminal l nt form)
       (define (inner clauses form)
         (cond
-         ((null? clauses) (error "couldn't match nt" nt form))
+         ((null? clauses) (error "couldn't match nt" (car nt) form))
          ((parse-clause l (car nt) (car clauses) form))
          (else (inner (cdr clauses) form))))
       (inner (cdr nt) form))
