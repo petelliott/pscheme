@@ -3,11 +3,13 @@
           (scheme cxr)
           (scheme write)
           (pscheme compiler util)
-          (srfi 1))
+          (srfi 1)
+          (srfi 28))
   (export language
           edit-language
           language-lazy-parse
           language-parse
+          parse->string
           language-unparse
           pass
           define-pass
@@ -85,36 +87,60 @@
         ((_ l0 (- transform ...) rest ...)
          (edit-language (language-del l0 (language transform ...)) rest ...))))
 
-    ;; lazy parsing primitives
+    ;; parse-tree types
+
+    (define-record-type nonterminal-node
+      (make-nt-node rule alt args)
+      nonterminal-node?
+      (rule nt-node-rule)
+      (alt nt-node-alt)
+      (args nt-node-args))
+
+    (define-record-type terminal-node
+      (make-t-node rule pred val)
+      terminal-node?
+      (rule t-node-rule)
+      (pred t-node-pred)
+      (val t-node-val))
+
+    (define (parse-node? obj)
+      (or (nonterminal-node? obj)
+          (terminal-node? obj)))
+
+    (define (node-rule obj)
+      (cond
+       ((terminal-node? obj) (t-node-rule obj))
+       ((nonterminal-node? obj) (nt-node-rule obj))
+       (else #f)))
+
+    (define-record-type lazy-node
+      (make-lazy-node raw cont)
+      lazy-node?
+      (raw lazy-node-raw)
+      (cont lazy-node-cont))
 
     (define-syntax lazy
       (syntax-rules ()
-        ((_ f e) (cons f (lambda () e)))))
+        ((_ f e) (make-lazy-node f (lambda () e)))))
 
     (define (cont-parse lazy)
-      ((cdr lazy)))
-
-    (define (dont-parse lazy)
-      (car lazy))
-
-    (define (is-lazy? form)
-      (and (pair? form)
-           (procedure? (cdr form))))
+      ((lazy-node-cont lazy)))
 
     (define (force-parsed parsed)
       (cond
-       ((is-lazy? parsed) (force-parsed (cont-parse parsed)))
-       ((procedure? (cadr parsed)) parsed)
-       (else
-        (mcons (car parsed)
-               (cadr parsed)
-               (nested-map-lazy force-parsed (cddr parsed))))))
+       ((lazy-node? parsed) (force-parsed (cont-parse parsed)))
+       ((terminal-node? parsed) parsed)
+       ((nonterminal-node? parsed)
+        (make-nt-node
+         (nt-node-rule parsed)
+         (nt-node-alt parsed)
+         (recursive-sloppy-map force-parsed (nt-node-args parsed))))))
 
     ;; parsing and unparsing
 
     (define (parse-terminal term form)
       (if ((cadr term) form)
-          `(,@term ,form)
+          (make-t-node (car term) (cadr term) form)
           (error "got someting other than" term form)))
 
     (define-syntax merge-results
@@ -166,7 +192,7 @@
           (if (equal? clause form) '() #f))))
       (define result (inner clause form))
       (if result
-          `(,nt ,clause ,@result)
+          (make-nt-node nt clause result)
           #f))
 
     (define (parse-nonterminal l nt form)
@@ -183,8 +209,6 @@
           (caar l)))
 
     (define (language-lazy-parse l form . rest)
-      (define a (write rest))
-      (define b (newline))
       (define alt-name (or (and (pair? rest) (car rest))
                            (default-alternative l)))
       (define alt (assoc alt-name l))
@@ -197,62 +221,14 @@
     (define (language-parse l form . rest)
       (force-parsed (apply language-lazy-parse l form rest)))
 
-    ;; helper functions for traversing argument lists
-
-    (define (is-nested? lst)
-      (and (pair? lst)
-           (pair? (car lst))))
-
-    (define (spliced-map proc lst)
-      (cond
-       ((null? lst) '())
-       ((symbol? (car lst))
-        (proc lst))
-       (else
-        (cons (proc (car lst))
-              (spliced-map proc (cdr lst))))))
-
-    (define (nested-map proc l)
-      (cond
-       ((null? l) '())
-       ((is-nested? (car l))
-        (cons (spliced-map proc (car l))
-              (nested-map proc (cdr l))))
-       (else
-        (cons (proc (car l))
-              (nested-map proc (cdr l))))))
-
-    (define (is-nested-lazy? lst)
-      (and (pair? lst)
-           (is-lazy? (car lst))))
-
-    (define (spliced-map-lazy proc lst)
-      (cond
-       ((null? lst) '())
-       ((is-lazy? lst)
-        (proc lst))
-       (else
-        (cons (proc (car lst))
-              (spliced-map proc (cdr lst))))))
-
-    (define (nested-map-lazy proc l)
-      (cond
-       ((null? l) '())
-       ((is-nested-lazy? (car l))
-        (cons (spliced-map-lazy proc (car l))
-              (nested-map-lazy proc (cdr l))))
-       (else
-        (cons (proc (car l))
-              (nested-map-lazy proc (cdr l))))))
-
     (define (language-unparse1 parsed proc)
-      (define forms (cddr parsed))
+      (define forms (and (nonterminal-node? parsed) (nt-node-args parsed)))
       (define (nonterminal pat)
         (define child (and (pair? forms) (car forms)))
         (cond
          ((is-splicing? pat)
           (set! forms (cdr forms))
-          (spliced-map proc child))
+          (sloppy-map proc child))
          ((is-syntax? 'unquote pat)
           (set! forms (cdr forms))
           (proc child))
@@ -260,12 +236,19 @@
           (cons (nonterminal (car pat))
                 (nonterminal (cdr pat))))
          (else pat)))
-      (if (procedure? (cadr parsed))
-          (lambda () (caddr parsed))
-          (nonterminal (cadr parsed))))
+      (if (terminal-node? parsed)
+          (t-node-val parsed)
+          (nonterminal (nt-node-alt parsed))))
 
     (define (language-unparse parsed)
       (language-unparse1 (force-parsed parsed) language-unparse))
+
+    (define (parse->string parsed)
+      (if (parse-node? parsed)
+          (format "@~a{~a}"
+                  (node-rule parsed)
+                  (language-unparse1 parsed parse->string))
+          (format "~a" parsed)))
 
     ;; passes
 
@@ -287,22 +270,22 @@
     (define-syntax pass-cases
       (syntax-rules ()
         ((_ rec parsed ())
-         ((language-unparse1 parsed rec)))
+         (language-unparse1 parsed (lambda (form) ((rec form)))))
         ((_ rec parsed ((form vars body ...) rest ...))
-         (if (equal? 'form (cadr parsed))
-             (apply (lambda vars body ...) (flatten-list-args (nested-map-lazy rec (cddr parsed))))
+         (if (equal? 'form (nt-node-alt parsed))
+             (apply (lambda vars body ...) (flatten-list-args (recursive-sloppy-map rec (nt-node-args parsed))))
              (pass-cases rec parsed (rest ...))))))
 
     (define-syntax pass-rules
       (syntax-rules ($)
         ((_ rec parsed ())
-         ((language-unparse1 parsed rec)))
+         (language-unparse1 parsed (lambda (form) ((rec form)))))
         ((_ rec parsed (($ term vars body ...) rest ...))
-         (if (equal? 'term (car parsed))
-             ((lambda vars body ...) (caddr parsed))
+         (if (equal? 'term (node-rule parsed))
+             ((lambda vars body ...) (t-node-val parsed))
              (pass-rules rec parsed (rest ...))))
         ((_ rec parsed ((nonterm cases ...) rest ...))
-         (if (equal? 'nonterm (car parsed))
+         (if (equal? 'nonterm (node-rule parsed))
              (pass-cases rec parsed (cases ...))
              (pass-rules rec parsed (rest ...))))))
 
@@ -315,9 +298,10 @@
                            (lambda rest
                              (cond
                               ((null? rest)
-                               (pass-rules rec (cont-parse lazy-form) (rules ...)))
+                               (let ((parsed (cont-parse lazy-form)))
+                                 (pass-rules rec parsed (rules ...))))
                               ((eq? (car rest) 'raw)
-                               (dont-parse lazy-form))
+                               (lazy-node-raw lazy-form))
                               (else (error "unexpected arguments to pass recursion:" rest)))))))
              ((rec parsed)))))))
 

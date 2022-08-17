@@ -7,7 +7,8 @@
           mangle-library
           any?
           mcons
-          sloppy-map)
+          sloppy-map
+          recursive-sloppy-map)
   (begin
 
     (define (is-syntax? sym form)
@@ -58,5 +59,13 @@
        (else
         (cons (proc (car lst))
               (sloppy-map proc (cdr lst))))))
+
+    (define (recursive-sloppy-map proc lst)
+      (cond
+       ((null? lst) '())
+       ((not (pair? lst)) (proc lst))
+       (else
+        (cons (recursive-sloppy-map proc (car lst))
+              (recursive-sloppy-map proc (cdr lst))))))
 
     ))
