@@ -9,6 +9,7 @@
           library-name
           library-imports
           add-library-import!
+          add-library-export!
           add-library-syntax!
           library-exports
           new-library
@@ -26,11 +27,14 @@
       library?
       (name library-name)
       (imports library-imports set-library-imports!)
-      (exports library-exports)
+      (exports library-exports set-library-exports!)
       (syntax library-syntax set-library-syntax!))
 
     (define (add-library-import! to-lib import-lib)
       (set-library-imports! to-lib (cons import-lib (library-imports to-lib))))
+
+    (define (add-library-export! to-lib export)
+      (set-library-exports! to-lib (cons export (library-exports export))))
 
     (define (add-library-syntax! lib name syntax)
       (set-library-syntax! lib (cons (cons name syntax) (library-syntax lib))))

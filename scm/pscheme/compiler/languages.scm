@@ -29,6 +29,7 @@
         (begin ,@proc-toplevel)
         (define ,identifier ,expression)
         (define (,identifier ,@identifier) ,@proc-toplevel)
+        (define-syntax ,identifier ,any)
         ,expression)
        (library-name
         (,@library-name-part))
@@ -45,6 +46,8 @@
         (if ,expression ,expression)
         (set! ,identifier ,expression)
         (quote ,any)
+        (builtin ,identifier ,@expression)
+        (ffi-symbol ,identifier)
         (,expression ,@expression) ;; procedure call
         ,identifier
         ,literal)))
