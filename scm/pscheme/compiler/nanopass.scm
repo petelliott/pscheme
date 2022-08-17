@@ -255,7 +255,7 @@
     (define (flatten-list-args args)
       (sloppy-map
        (lambda (args)
-         (if (pair? args)
+         (if (or (pair? args) (null? args))
              (let ((raw (sloppy-map (lambda (f) (f 'raw)) args)))
                (lambda rest
                  (cond
