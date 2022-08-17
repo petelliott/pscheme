@@ -2,7 +2,8 @@
   (import (scheme base)
           (pscheme compiler util)
           (pscheme compiler nanopass))
-  (export lscheme)
+  (export lscheme
+          normal-scheme)
   (begin
 
     (define (unquoted-literal? form)
@@ -51,5 +52,17 @@
         (,expression ,@expression) ;; procedure call
         ,identifier
         ,literal)))
+
+    (define normal-scheme
+      (edit-language
+       lscheme
+       (-
+        (literal unquoted-literal?)
+        (proc-toplevel
+         (define (,identifier ,@identifier) ,@proc-toplevel)
+         (define-syntax ,identifier ,any))
+        (expression
+         (if ,expression ,expression)
+         ,literal))))
 
     ))

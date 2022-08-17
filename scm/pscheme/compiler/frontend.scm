@@ -48,9 +48,19 @@
             (import-and-macroexpand (macroexpand1 (cons n (args 'raw))))
             `(,n ,@(args))))))
 
+    (define-pass normalize-forms (lscheme)
+      ($ literal (l)
+         `(quote ,l))
+      (proc-toplevel
+       ((define (,identifier ,@identifier) ,@proc-toplevel) (name args body)
+        `(define ,(name) (lambda ,(args) ,@(body)))))
+      (expression
+       ((if ,expression ,expression) (test tbranch)
+        `(if ,(test) ,(tbranch) (begin)))))
+
     (define frontend
       (concat-passes
-       (list
-        import-and-macroexpand)))
+       import-and-macroexpand
+       normalize-forms))
 
     ))

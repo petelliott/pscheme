@@ -310,7 +310,7 @@
         ((_ name (l0) rules ...)
          (define name (pass (l0) rules ...)))))
 
-    (define (concat-passes passes)
+    (define (concat-passes . passes)
       (lambda (form)
         (define (inner p f)
           (if (null? p)
