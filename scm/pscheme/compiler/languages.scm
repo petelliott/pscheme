@@ -83,16 +83,17 @@
          (ffi-symbol ,symbol)))
        (+
         (identifier
-         (ref (stack ,number))
-         (ref (arg ,number))
-         (ref (global ,library-name ,symbol))
-         (ref (closure ,number))
-         (ref (ffi ,symbol)))
+         (stack ,number)
+         (arg ,number)
+         (global ,library-name ,symbol)
+         (closure ,number)
+         (ffi ,symbol))
         (proc-toplevel
          (accumulate-rest ,number ,any)
          (push-locals ,number))
         (expression
-         (closure ,expression ,@any)
+         (ref ,identifier)
+         (closure ,expression ,@identifier)
          (lambda (,@symbol) ,@proc-toplevel)))))
 
     (define backend-lang

@@ -32,9 +32,9 @@
                     (add-library-export! (current-library) name))
                   (names))
         `(export ,@(names)))
-       ((import ,@identifier) (names)
+       ((import ,@library-name) (names)
         (do-import (names))
-        `(export ,@(names))))
+        `(import ,@(names))))
 
       (proc-toplevel
        ((define-syntax ,identifier ,any) (ident syntax)
@@ -117,7 +117,7 @@
 
     (define-pass resolve-names (normal-scheme)
       ($ identifier (i)
-         `(ref ,(lookup-var! i)))
+         (lookup-var! i))
 
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
@@ -145,7 +145,10 @@
               ,@(reverse (frame-closure (current-frame)))))))
 
        ((ffi-symbol ,symbol) (sym)
-        `(ref (ffi ,sym)))))
+        `(ref (ffi ,(sym))))
+
+       (,identifier (ident) `(ref ,(ident)))))
+
 
     (define (accumulate-library-decls forms imports exports begins)
       (if (null? forms)
