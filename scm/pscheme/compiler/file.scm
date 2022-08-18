@@ -9,6 +9,7 @@
           span-sc
           span-er
           span-ec
+          copy-span
           span-read-all
           normal-read
           strip-spans)
@@ -23,6 +24,15 @@
       (sc span-sc)
       (er span-er)
       (ec span-ec))
+
+    (define (copy-span span new-form)
+      (make-span
+       new-form
+       (span-file span)
+       (span-sr span)
+       (span-sc span)
+       (span-er span)
+       (span-ec span)))
 
     (define spans-on (make-parameter #f))
     (define file (make-parameter #f))
@@ -55,7 +65,9 @@
     (define (skip-line port)
       (define ch (peek-char port))
       (if (not (or (eqv? ch #\newline) (eof-object? ch)))
-          (get-char port)))
+          (begin
+            (get-char port)
+            (skip-line port))))
 
     (define (skip-cws port)
       (define pch (peek-char port))
@@ -76,12 +88,17 @@
          (get-char port)
          '())
         ((#\.)
-         (get-char port)
-         (let ((form (cread-any port)))
-           (skip-cws port)
-           (if (not (eqv? (get-char port) #\)))
-               (error "expected ')'" (file) (row) (col)))
-           form))
+         (let ((seq (cread-seq port)))
+           (if (= (length seq) 1)
+               (begin
+                 (get-char port)
+                 (let ((form (cread-any port)))
+                   (skip-cws port)
+                   (if (not (eqv? (get-char port) #\)))
+                       (error "expected ')'" (file) (row) (col)))
+                   form))
+               (cons (seq->symbol-or-number seq)
+                     (cread-list port)))))
         (else
          (cons (cread-any port)
                (cread-list port)))))
@@ -133,18 +150,20 @@
         (list->vector (strip-spans (cread-any port))))
        ((char=? #\\ (peek-char port))
         (get-char port)
-        (car (cread-seq port))) ;; TODO: add #\newline and stuff
+        (get-char port)) ;; TODO: add #\newline and stuff
        (else
         (let ((str (list->string (cread-seq port))))
           (cond
            ((equal? "f" str) #f)
            ((equal? "t" str) #t))))))
 
-    (define (cread-symbol-or-number port)
-      (define seq (cread-seq port))
+    (define (seq->symbol-or-number seq)
       (if (num-lit-seq? seq)
           (string->number (list->string seq))
           (string->symbol (list->string seq))))
+
+    (define (cread-symbol-or-number port)
+      (seq->symbol-or-number (cread-seq port)))
 
     (define (cread-any port)
       (skip-cws port)
@@ -174,7 +193,7 @@
             '()
             (cons obj (inner))))
       (parameterize ((file filename)
-                     (row 0)
+                     (row 1)
                      (col 0)
                      (spans-on #t))
         (inner)))
