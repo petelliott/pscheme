@@ -179,7 +179,7 @@
               (cread-string port))
              ((#\')
               (get-char port)
-              (cons quote (cread-any port)))
+              `(quote ,(cread-any port)))
              ((#\#)
               (get-char port)
               (cread-hash-sequence port))
