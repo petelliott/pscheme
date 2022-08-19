@@ -158,9 +158,9 @@
            ((equal? "t" str) #t))))))
 
     (define (seq->symbol-or-number seq)
-      (if (num-lit-seq? seq)
-          (string->number (list->string seq))
-          (string->symbol (list->string seq))))
+      (define str (list->string seq))
+      (or (string->number str)
+          (string->symbol str)))
 
     (define (cread-symbol-or-number port)
       (seq->symbol-or-number (cread-seq port)))
