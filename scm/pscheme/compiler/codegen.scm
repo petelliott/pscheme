@@ -29,7 +29,11 @@
       (enter-block-environment
        (lambda ()
          (emit 'c-prologue (library-entry (cadr form)))
-         (for-each codegen-stmt (cddr form))
+         (for-each (lambda (decl)
+                     (case (car decl)
+                       ((import) (codegen-import decl))
+                       ((begin) (for-each codegen-stmt (cdr decl)))))
+                   (cddr form))
          (emit 'c-epilogue)))
       'unspecified)
 
@@ -59,7 +63,9 @@
       'unspecified)
 
     (define (codegen-import stmt)
-      (emit 'c-call (library-entry (cadr stmt)))
+      (for-each (lambda (form)
+                  (emit 'c-call (library-entry form)))
+                (cdr stmt))
       'unspecified)
 
     (define (codegen-push-locals stmt)

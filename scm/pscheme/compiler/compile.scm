@@ -2,7 +2,7 @@
   (import (scheme base)
           (scheme file)
           (scheme read)
-          (srfi-28)
+          (srfi 28)
           (pscheme string)
           (pscheme compiler arch)
           (pscheme compiler arch x86_64)
@@ -10,6 +10,10 @@
           (pscheme compiler codegen)
           (pscheme compiler options)
           (pscheme compiler writeir)
+          (pscheme compiler languages) ;; tmp
+          (pscheme compiler nanopass) ;; tmp
+          (scheme write) ;;tmp
+          (pscheme compiler file)
           (only (gauche base) sys-system))
   (export compile-project
           compile-file
@@ -17,16 +21,10 @@
           linking-context)
   (begin
 
-    (define (read-all . args)
-      (define obj (apply read args))
-      (if (eof-object? obj)
-          '()
-          (cons obj (apply read-all args))))
-
     (define (read-file filename)
       (call-with-input-file filename
         (lambda (port)
-          (read-all port))))
+          (span-read-all port filename))))
 
     (define-record-type linker-options
       (make-linker-options objects)
@@ -57,7 +55,8 @@
       (define objfile (string-append filename ".o"))
       (compile-environment asmfile target
                            (lambda ()
-                             (define ir (map frontend (read-file filename)))
+                             (define program (read-file filename))
+                             (define ir (strip-spans (map frontend program)))
                              (writeir-for filename ir)
                              (case program-or-lib
                                ((program) (codegen-main-file ir))

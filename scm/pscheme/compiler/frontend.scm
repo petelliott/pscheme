@@ -5,7 +5,9 @@
           (pscheme compiler arch)
           (pscheme compiler library)
           (pscheme compiler syntax)
+          (pscheme compiler file)
           (pscheme compiler languages)
+          (pscheme compiler error)
           (pscheme compiler nanopass))
   (export frontend)
   (begin
@@ -19,34 +21,34 @@
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
-        (define lib (new-library (name) () ()))
+        (define lib (new-library (name 'raw) () ()))
         (parameterize ((current-library lib))
           `(define-library ,(name) ,@(decls))))
        ((import ,@library-name) (names)
-        (do-import (names))
+        (do-import (names 'raw))
         `(import ,@(names))))
 
       (library-declaration
        ((export ,@identifier) (names)
         (for-each (lambda (name)
                     (add-library-export! (current-library) name))
-                  (names))
+                  (names 'raw))
         `(export ,@(names)))
        ((import ,@library-name) (names)
-        (do-import (names))
+        (do-import (names 'raw))
         `(import ,@(names))))
 
       (proc-toplevel
        ((define-syntax ,identifier ,any) (ident syntax)
-        (add-library-syntax! (current-library) (ident) (cdr (syntax)))
+        (add-library-syntax! (current-library) (ident 'raw) (cdr (syntax 'raw)))
         '(begin)))
 
       (expression
        ((,expression ,@expression) (name args)
-        (define n (name))
+        (define n (name 'raw))
         (if (lookup-syntax n)
             (import-and-macroexpand (macroexpand1 (cons n (args 'raw))))
-            `(,n ,@(args))))))
+            `(,(name) ,@(args))))))
 
     (define-pass normalize-forms (lscheme)
       ($ literal (l)
@@ -121,7 +123,7 @@
 
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
-        (parameterize ((current-library (lookup-library (name))))
+        (parameterize ((current-library (lookup-library (name 'raw))))
           `(define-library ,(name) ,@(decls)))))
 
       (proc-toplevel
@@ -149,32 +151,10 @@
 
        (,identifier (ident) `(ref ,(ident)))))
 
-
-    (define (accumulate-library-decls forms imports exports begins)
-      (if (null? forms)
-          (values imports exports begins)
-          (accumulate-library-decls (cdr forms)
-                              (if (is-syntax? 'import (car forms)) (append imports (cdar forms)) imports)
-                              (if (is-syntax? 'export (car forms)) (append exports (cdar forms)) exports)
-                              (if (is-syntax? 'begin (car forms)) (append begins (cdar forms)) begins))))
-
-    (define-pass to-backend-form (ref-scheme)
-      (program-toplevel
-       ((define-library ,library-name ,@library-declaration) (name decls)
-        (define-values (imports exports begins) (accumulate-library-decls (decls) '() '() '()))
-        `(define-library ,(name)
-           ,@(map (lambda (imprt) `(import ,imprt)) imports)
-           ,@(map (lambda (form) `(begin ,form)) begins)))
-
-       ((import ,@library-name) (names)
-        `(begin ,@(map (lambda (imprt) `(import ,imprt)) (names))))))
-
-
     (define frontend
       (concat-passes
        import-and-macroexpand
        normalize-forms
-       resolve-names
-       to-backend-form))
+       resolve-names))
 
     ))

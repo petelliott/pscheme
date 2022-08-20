@@ -1,8 +1,9 @@
 (define-library (pscheme compiler nanopass)
   (import (scheme base)
           (scheme cxr)
-          (scheme write)
           (pscheme compiler util)
+          (pscheme compiler file)
+          (pscheme compiler error)
           (srfi 1)
           (srfi 28))
   (export language
@@ -129,6 +130,7 @@
     (define (force-parsed parsed)
       (cond
        ((lazy-node? parsed) (force-parsed (cont-parse parsed)))
+       ((span? parsed) (force-parsed (span-form parsed)))
        ((terminal-node? parsed) parsed)
        ((nonterminal-node? parsed)
         (make-nt-node
@@ -141,7 +143,7 @@
     (define (parse-terminal term form)
       (if ((cadr term) form)
           (make-t-node (car term) (cadr term) form)
-          (error "got someting other than" term form)))
+          (pscm-err "parsing terminal: expected ~a, got ~a" (car term) (strip-spans form))))
 
     (define-syntax merge-results
       (syntax-rules ()
@@ -182,14 +184,14 @@
                             form)))
          ((is-syntax? 'unquote clause)
           (let ((alt (assoc (cadr clause) l)))
-            (if (and (terminal? alt) (not ((cadr alt) form)))
+            (if (and (terminal? alt) (not ((cadr alt) (strip-spans form))))
                 #f
                 (list (language-lazy-parse l form (cadr clause))))))
          ((and (pair? clause) (pair? form))
-          (merge-results (inner (car clause) (car form))
-                         (inner (cdr clause) (cdr form))))
+          (merge-results (inner (car clause) (unspan1 (car form)))
+                         (inner (cdr clause) (unspan1 (cdr form)))))
          (else
-          (if (equal? clause form) '() #f))))
+          (if (equal? clause (strip-spans form)) '() #f))))
       (define result (inner clause form))
       (if result
           (make-nt-node nt clause result)
@@ -198,7 +200,7 @@
     (define (parse-nonterminal l nt form)
       (define (inner clauses form)
         (cond
-         ((null? clauses) (error "couldn't match nt" (car nt) form))
+         ((null? clauses) (pscm-err "parsing nonterminal: expected ~a, got ~a" (car nt) (strip-spans form)))
          ((parse-clause l (car nt) (car clauses) form))
          (else (inner (cdr clauses) form))))
       (inner (cdr nt) form))
@@ -208,6 +210,18 @@
           (default-alternative (cdr l))
           (caar l)))
 
+    (define-syntax preserve-span
+      (syntax-rules ()
+        ((_ (name maybe-span) body ...)
+         (let ((ms maybe-span))
+           (if (span? ms)
+               (copy-span ms
+                          (let ((name (span-form ms)))
+                            (parameterize ((pscheme-error-span  ms))
+                              body ...)))
+               (let ((name ms))
+                 body ...))))))
+
     (define (language-lazy-parse l form . rest)
       (define alt-name (or (and (pair? rest) (car rest))
                            (default-alternative l)))
@@ -215,8 +229,8 @@
       (unless alt
         (error "can't find alternative" alt-name))
       (if (terminal? alt)
-          (lazy form (parse-terminal alt form))
-          (lazy form (parse-nonterminal l alt form))))
+          (lazy form (preserve-span (rform form) (parse-terminal alt rform)))
+          (lazy form (preserve-span (rform form) (parse-nonterminal l alt rform)))))
 
     (define (language-parse l form . rest)
       (force-parsed (apply language-lazy-parse l form rest)))
@@ -244,11 +258,14 @@
       (language-unparse1 (force-parsed parsed) language-unparse))
 
     (define (parse->string parsed)
-      (if (parse-node? parsed)
-          (format "@~a{~a}"
-                  (node-rule parsed)
-                  (language-unparse1 parsed parse->string))
-          (format "~a" parsed)))
+      (cond
+       ((parse-node? parsed)
+        (format "@~a{~a}"
+                (node-rule parsed)
+                (language-unparse1 parsed parse->string)))
+       ((span? parsed)
+        (parse->string (span-form parsed)))
+       (else (format "~a" parsed))))
 
     ;; passes
 
@@ -299,9 +316,10 @@
                              (cond
                               ((null? rest)
                                (let ((parsed (cont-parse lazy-form)))
-                                 (pass-rules rec parsed (rules ...))))
+                                 (preserve-span (parsed2 parsed)
+                                   (pass-rules rec parsed2 (rules ...)))))
                               ((eq? (car rest) 'raw)
-                               (lazy-node-raw lazy-form))
+                               (strip-spans (lazy-node-raw lazy-form)))
                               (else (error "unexpected arguments to pass recursion:" rest)))))))
              ((rec parsed)))))))
 
