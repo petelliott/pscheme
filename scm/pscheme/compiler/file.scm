@@ -12,6 +12,7 @@
           copy-span
           span-read-all
           normal-read
+          unspan1
           strip-spans)
   (begin
 
@@ -144,13 +145,31 @@
                    (member (car seq) '(#\. #\- #\/)))
                (num-lit-seq? (cdr seq)))))
 
+    (define (named-character n)
+      (cond
+       ((equal? n "alarm") #\alarm)
+       ((equal? n "backspace") #\backspace)
+       ((equal? n "delete") #\delete)
+       ((equal? n "escape") #\escape)
+       ((equal? n "newline") #\newline)
+       ((equal? n "null") #\null)
+       ((equal? n "return") #\return)
+       ((equal? n "space") #\space)
+       ((equal? n "tab") #\tab)
+       (else (error "unknown character name" n))))
+
     (define (cread-hash-sequence port)
       (cond
        ((char=? #\( (peek-char port))
         (list->vector (strip-spans (cread-any port))))
        ((char=? #\\ (peek-char port))
         (get-char port)
-        (get-char port)) ;; TODO: add #\newline and stuff
+        (if (symbol-char? (peek-char port))
+            (let ((seq (cread-seq port)))
+              (if (null? (cdr seq))
+                  (car seq)
+                  (named-character (list->string seq))))
+            (get-char port)))
        (else
         (let ((str (list->string (cread-seq port))))
           (cond
@@ -201,6 +220,11 @@
     (define (normal-read port)
       (parameterize ((spans-on #f))
         (cread-any port)))
+
+    (define (unspan1 form)
+      (if (span? form)
+          (span-form form)
+          form))
 
     (define (strip-spans form)
       (cond
