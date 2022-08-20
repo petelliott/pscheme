@@ -33,7 +33,7 @@
         (for-each (lambda (name)
                     (add-library-export! (current-library) name))
                   (names 'raw))
-        `(export ,@(names)))
+        '(begin))
        ((import ,@library-name) (names)
         (do-import (names 'raw))
         `(import ,@(names))))
@@ -61,6 +61,18 @@
         `(if ,(test) ,(tbranch) (begin)))
        ((,expression ,@expression) (fn args)
         `(call ,(fn) ,@(args)))))
+
+    (define-pass track-defines (normal-scheme)
+      (program-toplevel
+       ((define-library ,library-name ,@library-declaration) (name decls)
+        (parameterize ((current-library (lookup-library (name 'raw))))
+          `(define-library ,(name) ,@(decls)))))
+
+      (proc-toplevel
+       ((define ,identifier ,expression) (ident expr)
+        (add-library-define! (current-library) (ident 'raw))
+        `(define ,(ident) ,(expr 'span)))
+       (,expression (expr) (expr 'span))))
 
     (define-record-type frame
       (make-frame args rest-arg locals closure parent)
@@ -98,7 +110,9 @@
 
     (define (lookup-var-frame! sym frame)
       (cond
-       ((null? frame)                     (lookup-global sym))
+       ((null? frame)
+        (or (lookup-global sym)
+            (pscm-err "undefined identifier ~a" sym)))
        ((eq? sym (frame-rest-arg frame))  '(stack 0))
        ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
        ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
@@ -155,6 +169,7 @@
       (concat-passes
        import-and-macroexpand
        normalize-forms
+       track-defines
        resolve-names))
 
     ))

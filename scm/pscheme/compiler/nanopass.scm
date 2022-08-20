@@ -273,14 +273,15 @@
       (sloppy-map
        (lambda (args)
          (if (or (pair? args) (null? args))
-             (let ((raw (sloppy-map (lambda (f) (f 'raw)) args)))
-               (lambda rest
-                 (cond
-                  ((null? rest)
-                   (sloppy-map (lambda (f) (f)) args))
-                  ((eq? (car rest) 'raw)
-                   raw)
-                  (else (error "unexpected arguments to pass recursion:" rest)))))
+             (lambda rest
+               (cond
+                ((null? rest)
+                 (sloppy-map (lambda (f) (f)) args))
+                ((eq? (car rest) 'raw)
+                 (sloppy-map (lambda (f) (f 'raw)) args))
+                ((eq? (car rest) 'span)
+                 (sloppy-map (lambda (f) (f 'span)) args))
+                (else (error "unexpected arguments to pass recursion:" rest))))
              args))
        args))
 
@@ -320,6 +321,8 @@
                                    (pass-rules rec parsed2 (rules ...)))))
                               ((eq? (car rest) 'raw)
                                (strip-spans (lazy-node-raw lazy-form)))
+                              ((eq? (car rest) 'span)
+                               (lazy-node-raw lazy-form))
                               (else (error "unexpected arguments to pass recursion:" rest)))))))
              ((rec parsed)))))))
 
