@@ -1,6 +1,7 @@
 (define-library (pscheme compiler file)
   (import (scheme base)
-          (scheme char))
+          (scheme char)
+          (pscheme compiler error))
   (export make-span
           span?
           span-form
@@ -61,7 +62,7 @@
 
     (define (no-eof port)
       (if (eof-object? (peek-char port))
-          (error "unexpected eof" (file) (row) (col))))
+          (pscm-err (with-span #f) "read: unexpected ~a" (peek-char port))))
 
     (define (skip-line port)
       (define ch (peek-char port))
@@ -95,8 +96,9 @@
                  (get-char port)
                  (let ((form (cread-any port)))
                    (skip-cws port)
-                   (if (not (eqv? (get-char port) #\)))
-                       (error "expected ')'" (file) (row) (col)))
+                   (let ((ch (get-char port)))
+                     (if (not (eqv? ch #\)))
+                         (pscm-err (with-span #f) "read: expected ~a, got ~a" #\) ch)))
                    form))
                (cons (seq->symbol-or-number seq)
                      (cread-list port)))))
@@ -145,7 +147,7 @@
                    (member (car seq) '(#\. #\- #\/)))
                (num-lit-seq? (cdr seq)))))
 
-    (define (named-character n)
+    (define (named-character n span)
       (cond
        ((equal? n "alarm") #\alarm)
        ((equal? n "backspace") #\backspace)
@@ -156,7 +158,7 @@
        ((equal? n "return") #\return)
        ((equal? n "space") #\space)
        ((equal? n "tab") #\tab)
-       (else (error "unknown character name" n))))
+       (else (pscm-err span "read: unknown character name ~a" n))))
 
     (define (cread-hash-sequence port)
       (cond
@@ -165,10 +167,10 @@
        ((char=? #\\ (peek-char port))
         (get-char port)
         (if (symbol-char? (peek-char port))
-            (let ((seq (cread-seq port)))
-              (if (null? (cdr seq))
-                  (car seq)
-                  (named-character (list->string seq))))
+            (let ((seq (with-span (cread-seq port))))
+              (if (null? (cdr (span-form seq)))
+                  (car (span-form seq))
+                  (named-character (list->string (span-form seq)) seq)))
             (get-char port)))
        (else
         (let ((str (list->string (cread-seq port))))
@@ -202,7 +204,7 @@
              (else
               (let ((seq (cread-seq port)))
                 (if (null? seq)
-                    (error "expected object")
+                    (pscm-err (with-span #f) "read: unexpected character ~a" (peek-char port))
                     (seq->symbol-or-number seq))))))))
 
     (define (span-read-all port filename)
