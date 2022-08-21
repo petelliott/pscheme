@@ -160,14 +160,15 @@
       (and r (list r)))
 
     (define (result-map proc forml)
+      (define uform (unspan1 forml))
       (cond
-       ((null? forml) '())
-       ((not (pair? forml))
+       ((null? uform) '())
+       ((not (pair? uform))
         (proc forml))
-       ((proc (car forml)) =>
+       ((proc (car uform)) =>
         (lambda (parsed)
           (cons parsed
-                (result-map proc (cdr forml)))))
+                (result-map proc (cdr uform)))))
        (else #f)))
 
     (define (is-splicing? clause)
@@ -175,8 +176,22 @@
            (pair? (car clause))
            (eq? (caar clause) 'unquote-splicing)))
 
+    (define-syntax preserve-span
+      (syntax-rules ()
+        ((_ (name maybe-span) body ...)
+         (let ((ms maybe-span))
+           (if (span? ms)
+               (copy-span ms
+                          (let ((name (span-form ms)))
+                            (parameterize ((pscheme-error-span  ms))
+                              body ...)))
+               (let ((name ms))
+                 body ...))))))
+
+
     (define (parse-clause l nt clause form)
       (define (inner clause form)
+        (define uform (unspan1 form))
         (cond
          ((is-splicing? clause)
           (list (result-map (lambda (f)
@@ -187,9 +202,9 @@
             (if (and (terminal? alt) (not ((cadr alt) (strip-spans form))))
                 #f
                 (list (language-lazy-parse l form (cadr clause))))))
-         ((and (pair? clause) (pair? form))
-          (merge-results (inner (car clause) (unspan1 (car form)))
-                         (inner (cdr clause) (unspan1 (cdr form)))))
+         ((and (pair? clause) (pair? uform))
+          (merge-results (inner (car clause) (car uform))
+                         (inner (cdr clause) (cdr uform))))
          (else
           (if (equal? clause (strip-spans form)) '() #f))))
       (define result (inner clause form))
@@ -209,18 +224,6 @@
       (if (terminal? (car l))
           (default-alternative (cdr l))
           (caar l)))
-
-    (define-syntax preserve-span
-      (syntax-rules ()
-        ((_ (name maybe-span) body ...)
-         (let ((ms maybe-span))
-           (if (span? ms)
-               (copy-span ms
-                          (let ((name (span-form ms)))
-                            (parameterize ((pscheme-error-span  ms))
-                              body ...)))
-               (let ((name ms))
-                 body ...))))))
 
     (define (language-lazy-parse l form . rest)
       (define alt-name (or (and (pair? rest) (car rest))
