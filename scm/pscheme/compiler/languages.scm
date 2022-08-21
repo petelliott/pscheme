@@ -4,8 +4,7 @@
           (pscheme compiler nanopass))
   (export lscheme
           normal-scheme
-          ref-scheme
-          backend-lang)
+          ref-scheme)
   (begin
 
     (define (unquoted-literal? form)
@@ -95,18 +94,5 @@
          (ref ,identifier)
          (closure ,expression ,@identifier)
          (lambda (,@symbol) ,@proc-toplevel)))))
-
-    (define backend-lang
-      (edit-language
-       ref-scheme
-       (-
-        (program-toplevel
-         (define-library ,library-name ,@library-declaration)
-         (import ,@library-name)))
-       (+
-        (program-toplevel
-         (define-library ,library-name ,@program-toplevel)
-         (import ,library-name)))))
-
 
     ))
