@@ -26,6 +26,10 @@
     (define (print-line text n span colour)
       (print-line-number n)
       (cond
+       ((eof-object? text)
+        (display colour)
+        (display "EOF")
+        (display "\x1b[0m"))
        ((and (= n (span-sr span))
              (= n (span-er span)))
         (display (substring text 0 (span-sc span)))
