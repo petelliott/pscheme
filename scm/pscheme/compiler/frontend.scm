@@ -13,7 +13,13 @@
   (begin
 
     (define (do-import libs)
-      (for-each compile-and-import libs))
+      (for-each (lambda (lib)
+                  (unless (library-filename (strip-spans lib))
+                    (if (span? lib)
+                        (pscm-err lib "can't find library ~a" (strip-spans lib)))
+                        (pscm-err "can't find library ~a" lib))
+                  (compile-and-import (strip-spans lib)))
+                libs))
 
     (define (macroexpand1 form)
       (apply-syntax-rules (lookup-syntax (car form)) form))
@@ -25,7 +31,7 @@
         (parameterize ((current-library lib))
           `(define-library ,(name) ,@(decls))))
        ((import ,@library-name) (names)
-        (do-import (names 'raw))
+        (do-import (names 'span))
         `(import ,@(names))))
 
       (library-declaration
@@ -35,7 +41,7 @@
                   (names 'raw))
         '(begin))
        ((import ,@library-name) (names)
-        (do-import (names 'raw))
+        (do-import (names 'span))
         `(import ,@(names))))
 
       (proc-toplevel
