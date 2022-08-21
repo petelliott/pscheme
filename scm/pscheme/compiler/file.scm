@@ -181,9 +181,6 @@
       (or (string->number str)
           (string->symbol str)))
 
-    (define (cread-symbol-or-number port)
-      (seq->symbol-or-number (cread-seq port)))
-
     (define (cread-any port)
       (skip-cws port)
       (if (eof-object? (peek-char port))
@@ -203,7 +200,10 @@
               (get-char port)
               (cread-hash-sequence port))
              (else
-              (cread-symbol-or-number port))))))
+              (let ((seq (cread-seq port)))
+                (if (null? seq)
+                    (error "expected object")
+                    (seq->symbol-or-number seq))))))))
 
     (define (span-read-all port filename)
       (define (inner)
