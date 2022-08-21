@@ -112,7 +112,7 @@
       (cond
        ((null? frame)
         (or (lookup-global sym)
-            (pscm-err "undefined identifier ~a" sym)))
+            (pscm-err "undefined variable ~a" sym)))
        ((eq? sym (frame-rest-arg frame))  '(stack 0))
        ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
        ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
