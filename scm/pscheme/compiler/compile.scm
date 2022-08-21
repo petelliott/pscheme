@@ -1,18 +1,13 @@
 (define-library (pscheme compiler compile)
   (import (scheme base)
           (scheme file)
-          (scheme read)
           (srfi 28)
           (pscheme string)
           (pscheme compiler arch)
-          (pscheme compiler arch x86_64)
           (pscheme compiler frontend)
           (pscheme compiler codegen)
           (pscheme compiler options)
           (pscheme compiler writeir)
-          (pscheme compiler languages) ;; tmp
-          (pscheme compiler nanopass) ;; tmp
-          (scheme write) ;;tmp
           (pscheme compiler file)
           (only (gauche base) sys-system))
   (export compile-project
