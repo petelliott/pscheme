@@ -161,10 +161,10 @@
        (else (pscm-err span "read: unknown character name ~a" n))))
 
     (define (cread-hash-sequence port)
-      (cond
-       ((char=? #\( (peek-char port))
+      (case (peek-char port)
+       ((#\()
         (list->vector (strip-spans (cread-any port))))
-       ((char=? #\\ (peek-char port))
+       ((#\\)
         (get-char port)
         (if (symbol-char? (peek-char port))
             (let ((seq (with-span (cread-seq port))))
