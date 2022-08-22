@@ -213,6 +213,11 @@
     (define (c-call label)
       (format "    call ~a\n" label))
 
+;;; extras
+
+    (define (file-extras)
+      ".section .note.GNU-stack,\"\",%progbits\n")
+
 ;;; builtins
 
     (define (assert-nargs args op target)
@@ -415,6 +420,7 @@
         (cons-literal . ,cons-literal)
         (string-literal . ,string-literal)
         (tag-label . ,tag-label)
-        (builtin . ,builtin)))
+        (builtin . ,builtin)
+        (file-extras . ,file-extras)))
 
     ))

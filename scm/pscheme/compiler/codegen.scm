@@ -12,10 +12,12 @@
        (lambda ()
          (emit 'c-prologue "main")
          (for-each codegen-stmt stmts)
-         (emit 'c-epilogue))))
+         (emit 'c-epilogue)
+         (emit 'file-extras))))
 
     (define (codegen-library-file stmts)
-      (for-each codegen-library-toplevel stmts))
+      (for-each codegen-library-toplevel stmts)
+      (emit 'file-extras))
 
     (define (codegen-library-toplevel stmt)
       (case (car stmt)
