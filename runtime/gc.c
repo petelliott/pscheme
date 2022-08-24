@@ -273,3 +273,49 @@ void pscheme_collect_garbage(void) {
     scan_range(&etext, &end);
     scan_range(&stack_top, stack_bottom());
 }
+
+static void calc_cells(struct cell_region *region, size_t *regions, size_t *total, size_t *used) {
+    if (region == NULL)
+        return;
+
+    *regions += 1;
+    *total += CELL_REGION_OBJS;
+    for (size_t i = 0; i < sizeof(region->allocated)/sizeof(size_t); ++i) {
+        *used += __builtin_popcount(region->allocated[i]);
+    }
+
+    calc_cells(region->next, regions, total, used);
+}
+
+static void calc_blocks(struct block_region *region, size_t *regions, size_t *total, size_t* objects, size_t *bytes) {
+    if (region == NULL)
+        return;
+
+    *regions += 1;
+    *total += BLOCK_REGION_BYTES;
+    for (struct block *b = region->alloclist; b != NULL; b = b->next) {
+        *objects += 1;
+        *bytes += b->length;
+    }
+
+    calc_blocks(region->next, regions, total, objects, bytes);
+}
+
+void pscheme_print_gc_stats(void) {
+    size_t cell_regions = 0, total_cells = 0, used_cells = 0;
+    calc_cells(cell_region, &cell_regions, &total_cells, &used_cells);
+
+    size_t block_regions = 0, total_block_bytes = 0, used_block_objects = 0, used_block_bytes = 0;
+    calc_blocks(block_region, &block_regions, &total_block_bytes, &used_block_objects, &used_block_bytes);
+
+    // TODO: stderr causes segfault for some reason
+    fprintf(stdout, "--- GC STATS ---\n");
+    fprintf(stdout, "cell regions: %lu\n", cell_regions);
+    fprintf(stdout, "total cells: %lu\n", total_cells);
+    fprintf(stdout, "allocated cells: %lu\n\n", used_cells);
+    fprintf(stdout, "block regions: %lu\n", block_regions);
+    fprintf(stdout, "total bytes: %lu\n", total_block_bytes);
+    fprintf(stdout, "allocated objects: %lu\n", used_block_objects);
+    fprintf(stdout, "allocated bytes: %lu\n\n", used_block_bytes);
+    fprintf(stdout, "total bytes: %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
+}
