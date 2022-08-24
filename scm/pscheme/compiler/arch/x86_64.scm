@@ -162,7 +162,7 @@
     (define (enclose l args)
       (format "~a    mov $~a, %rdi\n    call pscheme_allocate_block\n    mov %r12, 0(%rax)\n~a    or $~a, %rax\n"
               (mov l "%r12")
-              (+ 1 (* word-size (length args)))
+              (* word-size (+ 1 (length args)))
               (apply string-append
                      (map (lambda (arg i)
                             (format "    mov ~a, %rcx\n    mov %rcx, ~a(%rax)\n" (x86-arg arg) (* (+ i 1) word-size)))
@@ -279,7 +279,7 @@
 
     (define (builtin-alloc args tag)
       (assert-nargs args = 1)
-      (format "~a    shr $4, %rdi\n     shr $4, %rdi\n    call pscheme_allocate_block\n    or $~a, %rax\n"
+      (format "~a    shr $4, %rdi\n    call pscheme_allocate_block\n    or $~a, %rax\n"
               (mov (car args) "%rdi")
               tag))
 

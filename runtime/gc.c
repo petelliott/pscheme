@@ -15,7 +15,6 @@ struct cell_region {
     struct pscheme_cons_cell cells[CELL_REGION_OBJS];
 };
 
-
 /*
 static bool get_bit(size_t *array, size_t i) {
     return array[i/(sizeof(size_t)*8)]
@@ -25,9 +24,9 @@ static bool get_bit(size_t *array, size_t i) {
 
 static void set_bit(size_t *array, size_t i, bool val) {
     if (val) {
-        array[i/(sizeof(size_t)*8)] |= (1lu << (i % (sizeof(size_t)*8)));
+        array[i/(sizeof(size_t)*CHAR_BIT)] |= (1lu << (i % (sizeof(size_t)*CHAR_BIT)));
     } else {
-        array[i/(sizeof(size_t)*8)] &= ~(1lu << (i % (sizeof(size_t)*8)));
+        array[i/(sizeof(size_t)*CHAR_BIT)] &= ~(1lu << (i % (sizeof(size_t)*CHAR_BIT)));
     }
 }
 
@@ -78,15 +77,198 @@ static struct cell_region *cell_region = NULL;
 void *pscheme_allocate_cell(void) {
     void *ptr = allocate_or_null(cell_region);
     if (ptr == NULL) {
-        // TODO: collect garbage
-        cell_region = make_cell_region(cell_region);
+        //pscheme_collect_garbage();
         ptr = allocate_or_null(cell_region);
-        assert(ptr != NULL);
+        if (ptr == NULL) {
+            cell_region = make_cell_region(cell_region);
+            ptr = allocate_or_null(cell_region);
+            assert(ptr != NULL);
+        }
     }
     return ptr;
 }
 
+#define BLOCK_REGION_BYTES (1024*1024)
+
+struct block {
+    struct block *next;
+    size_t length;
+    char data[] __attribute__((aligned (16)));
+};
+
+struct block_region {
+    struct block_region *next;
+    struct block *freelist;
+    struct block *alloclist;
+    size_t uninit_off;
+    char data[BLOCK_REGION_BYTES] __attribute__((aligned (16)));
+};
+
+static struct block *try_allocate_block_freelist(struct block **block, size_t len) {
+    if (*block == NULL) {
+        return NULL;
+    }
+
+    // TODO: be smarter than this.
+    if ((*block)->length >= len) {
+        struct block *sblock = *block;
+        *block = (*block)->next; // delete from freelist
+        return sblock;
+    }
+
+    return try_allocate_block_freelist(&((*block)->next), len);
+}
+
+static void *try_allocate_block(struct block_region *region, size_t len) {
+    if (region == NULL) {
+        return NULL;
+    }
+
+    struct block *block = try_allocate_block_freelist(&(region->freelist), len);
+
+    if (block == NULL) {
+        if (len > BLOCK_REGION_BYTES - region->uninit_off - sizeof(struct block)) {
+            return try_allocate_block(region->next, len);
+        }
+
+        block = (void *)(region->data + region->uninit_off);
+        block->length = len;
+        region->uninit_off += sizeof(struct block) + len;
+        if (region->uninit_off % 16 != 0) {
+            // properly re-align.
+            region->uninit_off += (16 - (region->uninit_off % 16));
+        }
+    }
+
+    block->next = region->alloclist;
+    region->alloclist = block;
+    return block->data;
+}
+
+static struct block_region *make_block_region(struct block_region *next) {
+    struct block_region *region = malloc(sizeof(struct block_region));
+    region->next = next;
+    region->freelist = NULL;
+    region->alloclist = NULL;
+    region->uninit_off = 0;
+
+    return region;
+}
+
+static struct block_region *block_region = NULL;
+
 void *pscheme_allocate_block(size_t len) {
-    // TODO: write a garbage collector
-    return malloc(len);
+    void *ptr;
+    ptr = try_allocate_block(block_region, len);
+    if (ptr != NULL)
+        return ptr;
+
+    //pscheme_collect_garbage();
+    //ptr = try_allocate_block(block_region, len);
+    //if (ptr != NULL)
+    //    return ptr;
+
+    block_region = make_block_region(block_region);
+    ptr = try_allocate_block(block_region, len);
+
+    assert(ptr != NULL);
+    return ptr;
+}
+
+static void clear_allocated_bit(struct cell_region *region) {
+    if (region == NULL) {
+        return;
+    }
+
+    region->search_off = 0;
+    memset(region->allocated, 0, sizeof(region->allocated));
+
+    clear_allocated_bit(region->next);
+}
+
+static struct cell_region *find_cell_region(struct cell_region *region, struct pscheme_cons_cell *ptr) {
+    // find the region the cell is in.
+    struct cell_region *r = region;
+    for (; r != NULL; r = r->next) {
+        if (ptr >= r->cells && ptr < r->cells + CELL_REGION_OBJS) {
+            break;
+        }
+    }
+    return r;
+}
+
+static struct block_region *find_block_region(struct block_region *region, void *ptr) {
+    char *cptr = ptr;
+    struct block_region *r = region;
+    for (; r != NULL; r = r->next) {
+        if (cptr >= r->data && cptr < r->data + BLOCK_REGION_BYTES) {
+            break;
+        }
+    }
+    return r;
+}
+
+static void scan_object(pscheme_t obj) {
+    if (tag(obj) == PSCM_T_CONS) {
+        struct pscheme_cons_cell *cell = ptr(obj);
+
+        struct cell_region *r = find_cell_region(cell_region, cell);
+        if (r == NULL)
+            return;
+
+        // mark the cell as allocated.
+        set_bit(r->allocated, cell - r->cells, true);
+
+        scan_object(cell->car);
+        scan_object(cell->cdr);
+    } else if (tag(obj) == PSCM_T_CLOSURE) {
+        pscheme_t *closure = ptr(obj);
+
+        struct block_region *r = find_block_region(block_region, closure);
+        if (r == NULL)
+            return;
+
+        struct block *block = (void *)(((char *)closure) - sizeof(struct block));
+
+        for (size_t i = 1; i < (block->length / sizeof(pscheme_t)); ++i) {
+            scan_object(closure[i]);
+        }
+
+    } else if (tag(obj) == PSCM_T_STRING || tag(obj) == PSCM_T_SYMBOL) {
+        // TODO: actually GC blocks
+    }
+}
+
+static void scan_range(pscheme_t *start, pscheme_t *end) {
+    for (pscheme_t *i = start; i < end; ++i) {
+        scan_object(*i);
+    }
+}
+
+static pscheme_t *stack_bottom(void) {
+    static pscheme_t *bottom = NULL;
+    if (bottom == NULL) {
+        uintptr_t sb;
+        FILE *statfp = fopen("/proc/self/stat", "r");
+        assert(statfp != NULL);
+        fscanf(statfp,
+               "%*d %*s %*c %*d %*d %*d %*d %*d %*u "
+               "%*u %*u %*u %*u %*u %*u %*d %*d "
+               "%*d %*d %*d %*d %*u %*u %*d "
+               "%*u %*u %*u %lu", &sb);
+        bottom = (pscheme_t *) sb;
+
+        fclose(statfp);
+    }
+    return bottom;
+}
+
+extern pscheme_t etext, edata, end;
+
+void pscheme_collect_garbage(void) {
+    pscheme_t stack_top;
+
+    clear_allocated_bit(cell_region);
+    scan_range(&etext, &end);
+    scan_range(&stack_top, stack_bottom());
 }

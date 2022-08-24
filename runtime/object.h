@@ -10,7 +10,10 @@ enum pscheme_tags {
     PSCM_T_CONS,
     PSCM_T_SINGLETON,
     PSCM_T_STRING,
-    PSCM_T_CHAR
+    PSCM_T_CHAR,
+    PSCM_T_CLOSURE,
+    PSCM_T_SYMBOL,
+    PSCM_T_FOREIGN,
 };
 
 typedef uintptr_t pscheme_t;

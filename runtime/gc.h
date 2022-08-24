@@ -6,4 +6,6 @@
 void *pscheme_allocate_cell(void);
 void *pscheme_allocate_block(size_t len);
 
+void pscheme_collect_garbage(void);
+
 #endif
