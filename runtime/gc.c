@@ -6,7 +6,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#define MINI_REGIONS 0
+
+#if MINI_REGIONS
+#define CELL_REGION_OBJS 64
+#else
 #define CELL_REGION_OBJS (1024*1024)
+#endif
 
 struct cell_region {
     struct cell_region *next;
@@ -90,7 +96,11 @@ void *pscheme_allocate_cell(void) {
     return ptr;
 }
 
+#if MINI_REGIONS
+#define BLOCK_REGION_BYTES 1024
+#else
 #define BLOCK_REGION_BYTES (1024*1024)
+#endif
 
 struct block {
     struct block *next;
@@ -129,7 +139,9 @@ static void *try_allocate_block(struct block_region *region, size_t len) {
     struct block *block = try_allocate_block_freelist(&(region->freelist), len);
 
     if (block == NULL) {
-        if (len > BLOCK_REGION_BYTES - region->uninit_off - sizeof(struct block)) {
+        if (BLOCK_REGION_BYTES < region->uninit_off + sizeof(struct block) ||
+            len > BLOCK_REGION_BYTES - region->uninit_off - sizeof(struct block)) {
+
             return try_allocate_block(region->next, len);
         }
 
@@ -310,12 +322,12 @@ void pscheme_print_gc_stats(void) {
 
     // TODO: stderr causes segfault for some reason
     fprintf(stdout, "--- GC STATS ---\n");
-    fprintf(stdout, "cell regions: %lu\n", cell_regions);
-    fprintf(stdout, "total cells: %lu\n", total_cells);
-    fprintf(stdout, "allocated cells: %lu\n\n", used_cells);
-    fprintf(stdout, "block regions: %lu\n", block_regions);
-    fprintf(stdout, "total bytes: %lu\n", total_block_bytes);
+    fprintf(stdout, "cell regions:      %lu\n", cell_regions);
+    fprintf(stdout, "total cells:       %lu\n", total_cells);
+    fprintf(stdout, "allocated cells:   %lu\n\n", used_cells);
+    fprintf(stdout, "block regions:     %lu\n", block_regions);
+    fprintf(stdout, "total bytes:       %lu\n", total_block_bytes);
     fprintf(stdout, "allocated objects: %lu\n", used_block_objects);
-    fprintf(stdout, "allocated bytes: %lu\n\n", used_block_bytes);
-    fprintf(stdout, "total bytes: %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
+    fprintf(stdout, "allocated bytes:   %lu\n\n", used_block_bytes);
+    fprintf(stdout, "total bytes:       %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
 }
