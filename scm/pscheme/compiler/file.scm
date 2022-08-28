@@ -201,6 +201,16 @@
              ((#\#)
               (get-char port)
               (cread-hash-sequence port))
+             ((#\`)
+              (get-char port)
+              (cons 'quasiquote (cons (cread-any port) '())))
+             ((#\,)
+              (get-char port)
+              (if (equal? (peek-char port) #\@)
+                  (begin
+                    (get-char port)
+                    (cons 'unquote-splicing (cons (cread-any port) '())))
+                  (cons 'unquote (cons (cread-any port) '()))))
              (else
               (let ((seq (cread-seq port)))
                 (if (null? seq)
