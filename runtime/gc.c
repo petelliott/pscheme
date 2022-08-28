@@ -239,10 +239,12 @@ static void scan_object(pscheme_t obj) {
             pscheme_t *closure = p;
 
             struct block *block = (void *)(((char *)p) - sizeof(struct block));
-            block->free = false;
+            if (block->free) {
+                block->free = false;
 
-            for (size_t i = 1; i < (block->length / sizeof(pscheme_t)); ++i) {
-                scan_object(closure[i]);
+                for (size_t i = 1; i < (block->length / sizeof(pscheme_t)); ++i) {
+                    scan_object(closure[i]);
+                }
             }
         } else if (tag(obj) == PSCM_T_STRING || tag(obj) == PSCM_T_SYMBOL) {
             struct block *block = (void *)(((char *)p) - sizeof(struct block));
