@@ -320,14 +320,13 @@ void pscheme_print_gc_stats(void) {
     size_t block_regions = 0, total_block_bytes = 0, used_block_objects = 0, used_block_bytes = 0;
     calc_blocks(block_region, &block_regions, &total_block_bytes, &used_block_objects, &used_block_bytes);
 
-    // TODO: stderr causes segfault for some reason
-    fprintf(stdout, "--- GC STATS ---\n");
-    fprintf(stdout, "cell regions:      %lu\n", cell_regions);
-    fprintf(stdout, "total cells:       %lu\n", total_cells);
-    fprintf(stdout, "allocated cells:   %lu\n\n", used_cells);
-    fprintf(stdout, "block regions:     %lu\n", block_regions);
-    fprintf(stdout, "total bytes:       %lu\n", total_block_bytes);
-    fprintf(stdout, "allocated objects: %lu\n", used_block_objects);
-    fprintf(stdout, "allocated bytes:   %lu\n\n", used_block_bytes);
-    fprintf(stdout, "total bytes:       %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
+    fprintf(stderr, "--- GC STATS ---\n");
+    fprintf(stderr, "cell regions:      %lu\n", cell_regions);
+    fprintf(stderr, "total cells:       %lu\n", total_cells);
+    fprintf(stderr, "allocated cells:   %lu\n\n", used_cells);
+    fprintf(stderr, "block regions:     %lu\n", block_regions);
+    fprintf(stderr, "total bytes:       %lu\n", total_block_bytes);
+    fprintf(stderr, "allocated objects: %lu\n", used_block_objects);
+    fprintf(stderr, "allocated bytes:   %lu\n\n", used_block_bytes);
+    fprintf(stderr, "total bytes:       %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
 }

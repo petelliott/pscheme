@@ -328,16 +328,19 @@
         (cond
          ((null? args) '())
          ((null? regs)
-          (map (lambda (arg)
-                 (format "~a    push ~a\n"
-                         (ensure-lea-safe fn)
-                         (x86-arg-lea-safe fn)))
-               (reverse args)))
+          (map pusharg (reverse args)))
          (else
           (cons (mov (car args) (car regs))
                 (push-args (cdr args) (cdr regs))))))
+      (define (align-stack nargs)
+        (format "    andq $-0x10, %rsp\n~a"
+                (if (and (> nargs 6) (= 1 (modulo (- nargs 6) 2)))
+                    "    add $8, %rsp\n"
+                    "")))
+      ;; TODO: clean up the stack after (this only matters if people directly use ffi-call in arguments
       ;; we need to clear %rax when calling variadic functions
-      (format "~a    xor %rax, %rax\n    call ~a\n"
+      (format "~a~a    xor %rax, %rax\n    call ~a\n"
+              (align-stack (length args))
               (apply string-append (push-args (cdr args) regs))
               (x86-arg (car args))))
 
