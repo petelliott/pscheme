@@ -252,8 +252,10 @@ static void scan_object(pscheme_t obj) {
     }
 }
 
+#define ALIGN(ptr, pwr) ((typeof(ptr))((((uintptr_t)(ptr)) >> (pwr)) << (pwr)))
+
 static void scan_range(pscheme_t *start, pscheme_t *end) {
-    for (pscheme_t *i = start; i < end; ++i) {
+    for (pscheme_t *i = ALIGN(start, 3); i < end; ++i) {
         scan_object(*i);
     }
 }
