@@ -295,7 +295,7 @@ static void calc_cells(struct cell_region *region, size_t *regions, size_t *tota
     *regions += 1;
     *total += CELL_REGION_OBJS;
     for (size_t i = 0; i < sizeof(region->allocated)/sizeof(size_t); ++i) {
-        *used += __builtin_popcount(region->allocated[i]);
+        *used += __builtin_popcountl(region->allocated[i]);
     }
 
     calc_cells(region->next, regions, total, used);
