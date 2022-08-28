@@ -102,31 +102,29 @@ void *pscheme_allocate_cell(void) {
 
 struct block {
     struct block *next;
-    size_t length;
+    uint32_t length;
+    bool free;
     char data[] __attribute__((aligned (16)));
 };
 
 struct block_region {
     struct block_region *next;
-    struct block *freelist;
-    struct block *alloclist;
+    struct block *list;
     size_t uninit_off;
     char data[BLOCK_REGION_BYTES] __attribute__((aligned (16)));
 };
 
-static struct block *try_allocate_block_freelist(struct block **block, size_t len) {
-    if (*block == NULL) {
+static struct block *try_allocate_block_freelist(struct block *block, size_t len) {
+    if (block == NULL) {
         return NULL;
     }
 
     // TODO: be smarter than this.
-    if ((*block)->length >= len) {
-        struct block *sblock = *block;
-        *block = (*block)->next; // delete from freelist
-        return sblock;
+    if (block->free && block->length >= len) {
+        return block;
     }
 
-    return try_allocate_block_freelist(&((*block)->next), len);
+    return try_allocate_block_freelist(block->next, len);
 }
 
 static void *try_allocate_block(struct block_region *region, size_t len) {
@@ -134,7 +132,7 @@ static void *try_allocate_block(struct block_region *region, size_t len) {
         return NULL;
     }
 
-    struct block *block = try_allocate_block_freelist(&(region->freelist), len);
+    struct block *block = try_allocate_block_freelist(region->list, len);
 
     if (block == NULL) {
         if (BLOCK_REGION_BYTES < region->uninit_off + sizeof(struct block) ||
@@ -150,18 +148,19 @@ static void *try_allocate_block(struct block_region *region, size_t len) {
             // properly re-align.
             region->uninit_off += (16 - (region->uninit_off % 16));
         }
+
+        block->next = region->list;
+        region->list = block;
     }
 
-    block->next = region->alloclist;
-    region->alloclist = block;
+    block->free = false;
     return block->data;
 }
 
 static struct block_region *make_block_region(struct block_region *next) {
     struct block_region *region = malloc(sizeof(struct block_region));
     region->next = next;
-    region->freelist = NULL;
-    region->alloclist = NULL;
+    region->list = NULL;
     region->uninit_off = 0;
 
     return region;
@@ -184,17 +183,6 @@ void *pscheme_allocate_block(size_t len) {
     ptr = try_allocate_block(block_region, len);
     assert(ptr != NULL);
     return ptr;
-}
-
-static void clear_allocated_bit(struct cell_region *region) {
-    if (region == NULL) {
-        return;
-    }
-
-    region->search_off = 0;
-    memset(region->allocated, 0, sizeof(region->allocated));
-
-    clear_allocated_bit(region->next);
 }
 
 static struct cell_region *find_cell_region(struct cell_region *region, struct pscheme_cons_cell *ptr) {
@@ -252,6 +240,30 @@ static void scan_object(pscheme_t obj) {
     }
 }
 
+static void clear_allocated_bit(struct cell_region *region) {
+    if (region == NULL) {
+        return;
+    }
+
+    region->search_off = 0;
+    memset(region->allocated, 0, sizeof(region->allocated));
+
+    clear_allocated_bit(region->next);
+}
+
+/*
+static struct block *btail(struct block *block) {
+    if (block->next == NULL)
+        return block;
+
+    return btail(block->next);
+}
+
+static void free_all_blocks(struct block_region *region) {
+    btail(region->alloclist
+}
+*/
+
 #define ALIGN(ptr, pwr) ((typeof(ptr))((((uintptr_t)(ptr)) >> (pwr)) << (pwr)))
 
 static void scan_range(pscheme_t *start, pscheme_t *end) {
@@ -307,9 +319,11 @@ static void calc_blocks(struct block_region *region, size_t *regions, size_t *to
 
     *regions += 1;
     *total += BLOCK_REGION_BYTES;
-    for (struct block *b = region->alloclist; b != NULL; b = b->next) {
-        *objects += 1;
-        *bytes += b->length;
+    for (struct block *b = region->list; b != NULL; b = b->next) {
+        if (!b->free) {
+            *objects += 1;
+            *bytes += b->length;
+        }
     }
 
     calc_blocks(region->next, regions, total, objects, bytes);
