@@ -2,7 +2,7 @@
   (import (pscheme ffi))
   (export
    ;; 7.3: Derived expression types
-   cond case and or when unless let let* letrec letrec*
+   cond case and or when unless let let* letrec letrec* quasiquote
    ;; 6.1: Equivalence predicates
    eq? eqv? equal?
    ;; 6.2: Numbers
@@ -178,6 +178,18 @@
            (set! var1 init1)
            ...
            (let () body1 body2 ...)))))
+
+    (define-syntax quasiquote
+      (syntax-rules (unquote unquote-splicing)
+        ((_ (unquote form))
+         form)
+        ((_ ((unquote-splicing form) . rest))
+         (append form (quasiquote rest)))
+        ((_ (first . rest))
+         (cons (quasiquote first)
+               (quasiquote rest)))
+        ((_ form)
+         (quote form))))
 
     ;;; 6.1: Equivalence predicates
 
