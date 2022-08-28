@@ -24,43 +24,6 @@
     (define (macroexpand1 form)
       (apply-syntax-rules (lookup-syntax (car form)) form))
 
-    (define (is-span-syntax? sym form)
-      (and (pair? form)
-           (eq? (unspan1 (car form)) sym)))
-
-    (define (is-span-splicing? form)
-      (and (pair? form)
-           (pair? (unspan1 (car form)))
-           (eq? (unspan1 (car (unspan1 (car form))))
-                'unquote-splicing)))
-
-    (define (unquote-pure? form)
-      (cond
-       ((span? form) (unquote-pure? (span-form form)))
-       ((or (eq? form 'unquote)
-            (eq? form 'unquote-splicing))
-        #f)
-       ((pair? form)
-        (and (unquote-pure? (car form))
-             (unquote-pure? (cdr form))))
-       (else #t)))
-
-    (define (un-quasiquote form)
-      (cond
-       ((span? form) (un-quasiquote (span-form form)))
-       ((is-span-syntax? 'unquote form)
-        (import-and-macroexpand (cadr form)))
-       ((is-span-splicing? form)
-         `(append ,(import-and-macroexpand (cadr (unspan1 (car form))))
-                  ,(un-quasiquote (cdr form))))
-       ((unquote-pure? form)
-        `(quote ,form))
-       ((pair? form)
-        `(cons ,(un-quasiquote (car form))
-               ,(un-quasiquote (cdr form))))
-       (else
-        `(quote ,form))))
-
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
@@ -91,10 +54,7 @@
         (define n (name 'raw))
         (if (lookup-syntax n)
             (import-and-macroexpand (macroexpand1 (cons n (args 'raw))))
-            `(,(name) ,@(args))))
-
-       ((quasiquote ,any) (form)
-        (un-quasiquote (form 'span)))))
+            `(,(name) ,@(args))))))
 
     (define-pass normalize-forms (lscheme)
       ($ literal (l)

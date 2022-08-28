@@ -50,7 +50,6 @@
         (if ,expression ,expression)
         (set! ,identifier ,expression)
         (quote ,any)
-        (quasiquote ,any)
         (builtin ,symbol ,@expression)
         (ffi-symbol ,symbol)
         (,expression ,@expression) ;; procedure call
@@ -67,7 +66,6 @@
          (define-syntax ,identifier ,any))
         (expression
          (if ,expression ,expression)
-         (quasiquote ,any)
          (,expression ,@expression)
          ,literal))
        (+
