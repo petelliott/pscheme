@@ -24,12 +24,15 @@ static inline uintptr_t sra(uintptr_t x, uintptr_t y) {
     return top | bottom;
 }
 
-
 static inline void *ptr(pscheme_t obj) { return (void *)(obj & ~0xf); }
 static inline uintptr_t unum(pscheme_t obj) { return obj >> 4; }
 static inline intptr_t num(pscheme_t obj) { return (intptr_t)(sra(obj, 4)); }
 static inline uintptr_t tag(pscheme_t obj) { return obj & 0xf; }
 
+static inline bool is_ptr_obj(pscheme_t obj) {
+    uintptr_t t = tag(obj);
+    return t == PSCM_T_CONS || t == PSCM_T_STRING || t == PSCM_T_CLOSURE || t == PSCM_T_SYMBOL;
+}
 
 struct pscheme_cons_cell {
     pscheme_t car;
