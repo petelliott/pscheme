@@ -21,12 +21,10 @@ struct cell_region {
     struct pscheme_cons_cell cells[CELL_REGION_OBJS];
 };
 
-/*
 static bool get_bit(size_t *array, size_t i) {
     return array[i/(sizeof(size_t)*8)]
         & (1lu << (i % (sizeof(size_t)*8)));
 }
-*/
 
 static void set_bit(size_t *array, size_t i, bool val) {
     if (val) {
@@ -229,11 +227,13 @@ static void scan_object(pscheme_t obj) {
         if (r == NULL)
             return;
 
-        // mark the cell as allocated.
-        set_bit(r->allocated, cell - r->cells, true);
+        if (!get_bit(r->allocated, cell - r->cells)) {
+            // mark the cell as allocated.
+            set_bit(r->allocated, cell - r->cells, true);
 
-        scan_object(cell->car);
-        scan_object(cell->cdr);
+            scan_object(cell->car);
+            scan_object(cell->cdr);
+        }
     } else if (tag(obj) == PSCM_T_CLOSURE) {
         pscheme_t *closure = ptr(obj);
 
