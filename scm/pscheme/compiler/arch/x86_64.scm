@@ -258,7 +258,7 @@
 
     (define (builtin-cons args)
       (assert-nargs args = 2)
-      (format "~a~a     call pscheme_allocate_cell\n    mov %r12, 0(%rax)\n    mov %r14, 8(%rax)\n    or $~a, %rax\n"
+      (format "~a~a    call pscheme_allocate_cell\n    mov %r12, 0(%rax)\n    mov %r14, 8(%rax)\n    or $~a, %rax\n"
               (mov (car args) "%r12")
               (mov (cadr args) "%r14")
               PSCM-T-CONS))
@@ -272,8 +272,8 @@
     (define (builtin-set-car/cdr! args off)
       (assert-nargs args = 2)
       (format "~a~a    shr $4, %rcx\n    shl $4, %rcx\n    mov %rax, ~a(%rcx)\n~a"
-              (mov (cadr args) "%rcx")
-              (mov (car args) 'result)
+              (mov (car args) "%rcx")
+              (mov (cadr args) 'result)
               off
               (mov 'unspecified 'result)))
 

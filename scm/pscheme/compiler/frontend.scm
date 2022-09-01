@@ -1,6 +1,7 @@
 (define-library (pscheme compiler frontend)
   (import (scheme base)
           (scheme cxr)
+          (srfi 1)
           (pscheme compiler util)
           (pscheme compiler arch)
           (pscheme compiler library)
@@ -99,11 +100,12 @@
 
     (define (define-var! sym)
       (if (not (null? (current-frame)))
-          (set-frame-locals! (current-frame) (cons sym (frame-locals (current-frame))))))
+          (set-frame-locals! (current-frame) (cons (make-var-metadata sym #f #f)
+                                                   (frame-locals (current-frame))))))
 
     (define (rest-arg arg-list)
       (cond
-       ((symbol? arg-list) arg-list)
+       ((symbol? arg-list) (make-var-metadata arg-list #f #f))
        ((null? arg-list) #f)
        ((pair? arg-list) (rest-arg (cdr arg-list)))
        (else (error "malformed argument list" arg-list))))
@@ -112,27 +114,38 @@
       (if (or (null? arg-list)
               (symbol? arg-list))
           onto
-          (regular-args (cdr arg-list) (cons (car arg-list) onto))))
+          (regular-args (cdr arg-list)
+                        (cons (make-var-metadata (car arg-list) #f #f) onto))))
+
+    (define (vm-cmp a b)
+      (equal? (if (var-metadata? a) (vm-sym a) a)
+              (if (var-metadata? b) (vm-sym b) b)))
 
     (define (lookup-var-frame! sym frame)
       (cond
        ((null? frame)
         (or (lookup-global sym)
             (pscm-err "undefined variable ~a" sym)))
-       ((eq? sym (frame-rest-arg frame))  '(stack 0))
-       ((member sym (frame-locals frame)) `(stack ,(- (length (member sym (frame-locals frame))) 1)))
-       ((member sym (frame-args frame))   `(arg ,(- (length (member sym (frame-args frame))) 1)))
-       ((assq sym (frame-closure frame))  (error "this is fake")) ;(assq sym (frame-closure frame)))
+       ((and (frame-rest-arg frame)
+             (eq? sym (vm-sym (frame-rest-arg frame))))
+        `(stack 0 ,(frame-rest-arg frame)))
+       ((member sym (frame-locals frame) vm-cmp) =>
+        (lambda (m)
+          `(stack ,(- (length m) 1) ,(car m))))
+       ((member sym (frame-args frame) vm-cmp)  =>
+        (lambda (m)
+          `(arg ,(- (length m) 1) ,(car m))))
        (else
         (let ((parent-ref (lookup-var-frame! sym (frame-parent frame))))
           (if (is-syntax? 'global parent-ref)
               parent-ref
-              (let ((clos (member parent-ref (frame-closure frame))))
+              (let ((clos (member parent-ref (frame-closure frame) vm-cmp)))
                 (if clos
-                    `(closure ,(- (length clos) 1))
+                    `(closure ,(- (length clos) 1) ,(last (car clos)))
                     (begin
                       (set-frame-closure! frame (cons parent-ref (frame-closure frame)))
-                      `(closure ,(- (length (frame-closure frame)) 1))))))))))
+                      `(closure ,(- (length (frame-closure frame)) 1)
+                                ,(last (car (frame-closure frame))))))))))))
 
     (define (lookup-var! sym)
       (lookup-var-frame! sym (current-frame)))
@@ -158,7 +171,7 @@
           (let* ((processed-body (body))
                  (nlocals (length (frame-locals (current-frame)))))
             `(closure
-              (lambda ,arglist
+              (lambda ,(sloppy-map (lambda (var) (make-box (lookup-var! var))) arglist)
                 ,@(if (frame-rest-arg (current-frame))
                       `((accumulate-rest ,(length (frame-args (current-frame))) (stack 0)))
                       '())
@@ -171,11 +184,71 @@
 
        (,identifier (ident) `(ref ,(ident)))))
 
+    (define in-var (make-parameter #f))
+
+    (define-pass flag-sets (ref-scheme)
+      (proc-toplevel
+       ((define ,identifier ,expression) (ident expr)
+        (parameterize ((in-var (and (var-metadata? (last (ident 'raw)))
+                                    (last (ident 'raw)))))
+          `(define ,(ident) ,(expr)))))
+
+      (expression
+       ((set! ,identifier ,expression) (i e)
+        (if (var-metadata? (last (i 'raw)))
+            (vm-set-ever-set! (last (i 'raw)) #t))
+        `(set! ,(i) ,(e)))
+       ((closure ,expression ,@identifier) (expr idents)
+        (for-each (lambda (i)
+                    (when (var-metadata? (last i))
+                      (vm-set-ever-enclosed! (last i) #t)
+                      (when (and (in-var)
+                                 (eq? (in-var) (last i)))
+                        (vm-set-ever-set! (last i) #t))))
+                  (idents 'raw))
+        `(closure ,(expr) ,@(idents)))))
+
+    (define (should-box ref)
+      (and (var-metadata? (last ref))
+           (vm-ever-set? (last ref))
+           (vm-ever-enclosed? (last ref))))
+
+    (define-pass box-sets (ref-scheme)
+      (proc-toplevel
+       ((define ,identifier ,expression) (ident expr)
+        (if (should-box (ident 'raw))
+            `(begin
+               (define ,(ident) (builtin cons '#f '#f))
+               (builtin set-cdr! (ref ,(ident)) ,(expr)))
+            `(define ,(ident) ,(expr)))))
+
+      (expression
+       ((set! ,identifier ,expression) (ident expr)
+        (if (should-box (ident 'raw))
+            `(builtin set-cdr! (ref ,(ident)) ,(expr))
+            `(set! ,(ident) ,(expr))))
+
+       ((lambda (,@identifier) ,@proc-toplevel) (args body)
+        `(lambda (,@(args))
+           ,@(sloppy-map (lambda (arg)
+                       (if (should-box (unbox arg))
+                           `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
+                           `(begin)))
+                     (args 'raw))
+           ,@(body)))
+
+       ((ref ,identifier) (identifier)
+        (if (should-box (identifier 'raw))
+            `(builtin cdr (ref ,(identifier)))
+            `(ref ,(identifier))))))
+
     (define frontend
       (concat-passes
        import-and-macroexpand
        normalize-forms
        track-defines
-       resolve-names))
+       resolve-names
+       flag-sets
+       box-sets))
 
     ))

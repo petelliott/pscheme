@@ -1,9 +1,21 @@
 (define-library (pscheme compiler languages)
   (import (scheme base)
           (pscheme compiler util)
+          (pscheme compiler file)
           (pscheme compiler nanopass))
   (export lscheme
           normal-scheme
+          make-var-metadata
+          var-metadata?
+          vm-ever-set?
+          vm-set-ever-set!
+          vm-ever-enclosed?
+          vm-set-ever-enclosed!
+          vm-sym
+          vm-span
+          make-box
+          box?
+          unbox
           ref-scheme)
   (begin
 
@@ -72,6 +84,26 @@
         (expression
          (call ,expression ,@expression)))))
 
+    (define-record-type var-metadata
+      (make-var-metadata sym-span ever-set ever-enclosed)
+      var-metadata?
+      (sym-span vm-sym-span)
+      (ever-set vm-ever-set? vm-set-ever-set!)
+      (ever-enclosed vm-ever-enclosed? vm-set-ever-enclosed!))
+
+    (define (vm-sym vm)
+      (unspan1 (vm-sym-span vm)))
+
+    (define (vm-span vm)
+      (and (span? (vm-sym-span vm))
+           (vm-sym-span vm)))
+
+    ;; TODO: this is a really ugly hack
+    (define-record-type box
+      (make-box obj)
+      box?
+      (obj unbox))
+
     (define ref-scheme
       (edit-language
        normal-scheme
@@ -81,18 +113,20 @@
          (lambda (,@identifier) ,@proc-toplevel)
          (ffi-symbol ,symbol)))
        (+
+        (box box?)
+        (var-metadata var-metadata?)
         (identifier
-         (stack ,number)
-         (arg ,number)
+         (stack ,number ,var-metadata)
+         (arg ,number ,var-metadata)
          (global ,library-name ,symbol)
-         (closure ,number)
+         (closure ,number ,var-metadata)
          (ffi ,symbol))
         (proc-toplevel
          (accumulate-rest ,number ,any)
          (push-locals ,number))
         (expression
          (ref ,identifier)
-         (closure ,expression ,@identifier)
-         (lambda (,@symbol) ,@proc-toplevel)))))
+         (lambda (,@box) ,@proc-toplevel)
+         (closure ,expression ,@identifier)))))
 
     ))
