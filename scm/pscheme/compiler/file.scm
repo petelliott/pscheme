@@ -125,7 +125,7 @@
               ((#\\) #\\)
               ((#\|) #\|)
               ((#\newline) #\newline)
-              ((#\e) #\space)) ;; non-standard extension
+              ((#\e) #\escape)) ;; non-standard extension
             (inner)))
           (else
            (cons ch (inner)))))
