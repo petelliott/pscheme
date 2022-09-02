@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+script_dir=$(dirname $(realpath $0))
+
+exitcode=0
+
+for test in $(find $script_dir -name '*.scm')
+do
+    echo $test
+    $script_dir/../pscheme $test
+    ./a.out
+    if [[ $? -ne 0 ]]; then
+        exitcode=1
+    fi
+done
+rm -f a.out
+exit $exitcode
