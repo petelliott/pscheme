@@ -149,8 +149,17 @@
       (format "\n    .data\n    .type ~a, STT_OBJECT\n    .align 16\n~a:\t.8byte ~a, ~a\n"
               label label (x86-data left) (x86-data right)))
 
+    (define (string->asm str)
+      (string-append
+       "\""
+       (apply string-append
+              (map (lambda (c)
+                     (format "\\x~a" (number->string (char->integer c) 16)))
+                   (string->list str)))
+      "\""))
+
     (define (string-literal label value)
-      (format "\n    .data\n    .type ~a, STT_OBJECT\n    .align 16\n~a:\t.asciz ~s\n" label label value))
+      (format "\n    .data\n    .type ~a, STT_OBJECT\n    .align 16\n~a:\t.asciz ~a\n" label label (string->asm value)))
 
     (define (tag-label label tag)
       (format "(~a + ~a)" label
