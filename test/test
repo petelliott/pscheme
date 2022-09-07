@@ -8,9 +8,13 @@ for test in $(find $script_dir -name '*.scm')
 do
     echo $test
     $script_dir/../pscheme $test
-    ./a.out
     if [[ $? -ne 0 ]]; then
         exitcode=1
+    else
+        ./a.out
+        if [[ $? -ne 0 ]]; then
+            exitcode=1
+        fi
     fi
 done
 rm -f a.out

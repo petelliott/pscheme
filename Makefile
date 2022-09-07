@@ -14,7 +14,10 @@ $(RUNTIME_TARGET): $(RUNTIME_OBJS)
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 
-.PHONY: clean
+.PHONY: clean check
 
 clean:
 	rm runtime/*.a runtime/*.o
+
+check:
+	test/test
