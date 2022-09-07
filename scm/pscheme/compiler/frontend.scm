@@ -172,10 +172,11 @@
                  (nlocals (length (frame-locals (current-frame)))))
             `(closure
               (lambda ,(sloppy-map (lambda (var) (make-box (lookup-var! var))) arglist)
-                ,@(if (frame-rest-arg (current-frame))
-                      `((accumulate-rest ,(length (frame-args (current-frame))) (stack 0)))
-                      '())
-                (push-locals ,nlocals)
+                (begin
+                  ,@(if (frame-rest-arg (current-frame))
+                        `((accumulate-rest ,(length (frame-args (current-frame))) (stack 0)))
+                        '())
+                  (push-locals ,nlocals))
                 ,@processed-body)
               ,@(reverse (frame-closure (current-frame)))))))
 
@@ -238,13 +239,15 @@
             `(set! ,(ident) ,(expr))))
 
        ((lambda (,@box) ,@proc-toplevel) (args body)
+        (define b (body))
         `(lambda (,@(args))
+           ,(car b) ;; make sure we accumulate the rest arguments before boxing them
            ,@(map (lambda (arg)
                     (if (should-box (unbox arg))
                         `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
                         `(begin)))
                      (improper->proper (args 'raw)))
-           ,@(body)))
+           ,@(cdr b)))
 
        ((ref ,identifier) (identifier)
         (if (should-box (identifier 'raw))

@@ -54,11 +54,11 @@
   (assert (equal? (c2) 8))
   (assert (equal? (c2) 9)))
 
-(define-test "mutable rest closure" SKIP
+(define-test "mutable rest closure"
   (define (ctr2 . cnt)
     (lambda ()
       (set! cnt (list (+ (car cnt) 1)))
-      cnt))
+      (car cnt)))
 
   (define c2 (ctr2 4))
   (assert (equal? (c2) 5))
