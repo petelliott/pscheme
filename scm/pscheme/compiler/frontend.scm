@@ -2,6 +2,7 @@
   (import (scheme base)
           (scheme cxr)
           (srfi 1)
+          (pscheme match)
           (pscheme compiler util)
           (pscheme compiler arch)
           (pscheme compiler library)
@@ -57,6 +58,21 @@
             (import-and-macroexpand (macroexpand1 (cons n (args 'raw))))
             `(,(name) ,@(args))))))
 
+    (define-pass track-defines (lscheme)
+      (program-toplevel
+       ((define-library ,library-name ,@library-declaration) (name decls)
+        (parameterize ((current-library (lookup-library (name 'raw))))
+          `(define-library ,(name) ,@(decls)))))
+
+      (proc-toplevel
+       ((define ,identifier ,expression) (ident expr)
+        (add-library-define! (current-library) (ident 'raw) #f)
+        `(define ,(ident) ,(expr 'span)))
+       ((define (,identifier ,@identifier) ,@proc-toplevel) (ident args body)
+        (add-library-define! (current-library) (ident 'raw) (args 'raw))
+        `(define (,(ident) ,@(args)) ,@(body 'span)))
+       (,expression (expr) (expr 'span))))
+
     (define-pass normalize-forms (lscheme)
       ($ literal (l)
          `(quote ,l))
@@ -68,18 +84,6 @@
         `(if ,(test) ,(tbranch) (begin)))
        ((,expression ,@expression) (fn args)
         `(call ,(fn) ,@(args)))))
-
-    (define-pass track-defines (normal-scheme)
-      (program-toplevel
-       ((define-library ,library-name ,@library-declaration) (name decls)
-        (parameterize ((current-library (lookup-library (name 'raw))))
-          `(define-library ,(name) ,@(decls)))))
-
-      (proc-toplevel
-       ((define ,identifier ,expression) (ident expr)
-        (add-library-define! (current-library) (ident 'raw))
-        `(define ,(ident) ,(expr 'span)))
-       (,expression (expr) (expr 'span))))
 
     (define-record-type frame
       (make-frame args rest-arg locals closure parent)
@@ -185,6 +189,27 @@
 
        (,identifier (ident) `(ref ,(ident)))))
 
+    (define (arg-match args shape)
+      (cond
+       ((and (null? args) (null? shape))
+        #t)
+       ((and (pair? args) (pair? shape))
+        (arg-match (cdr args) (cdr shape)))
+       ((symbol? shape) #t)
+       ((null? args) #f)
+       ((null? shape) #f)))
+
+    (define-pass check-args (ref-scheme)
+      (expression
+       ((call ,expression ,@expression) (f args)
+        (match (f 'raw)
+          ((ref (global ,lname ,sym))
+           (let* ((shape (assoc sym (library-defines (lookup-library lname))))
+                  (shape (and shape (cdr shape))))
+             (when (and shape (not (arg-match (args 'raw) shape)))
+               (pscm-warn "wrong number of arguments to function ~a" (cons sym shape))))))
+        `(call ,(f) ,@(args)))))
+
     (define in-var (make-parameter #f))
 
     (define-pass flag-sets (ref-scheme)
@@ -257,9 +282,10 @@
     (define frontend
       (concat-passes
        import-and-macroexpand
-       normalize-forms
        track-defines
+       normalize-forms
        resolve-names
+       check-args
        flag-sets
        box-sets))
 

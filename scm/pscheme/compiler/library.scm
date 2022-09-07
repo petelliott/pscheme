@@ -8,6 +8,7 @@
   (export library?
           library-name
           library-imports
+          library-defines
           add-library-import!
           add-library-export!
           add-library-define!
@@ -38,8 +39,8 @@
     (define (add-library-export! to-lib export)
       (set-library-exports! to-lib (cons export (library-exports to-lib))))
 
-    (define (add-library-define! to-lib name)
-      (set-library-defines! to-lib (cons name (library-defines to-lib))))
+    (define (add-library-define! to-lib name sig)
+      (set-library-defines! to-lib (cons (cons name sig) (library-defines to-lib))))
 
     (define (add-library-syntax! lib name syntax)
       (set-library-syntax! lib (cons (cons name syntax) (library-syntax lib))))
@@ -74,7 +75,7 @@
       (add-library-import! (current-library) (lookup-library name)))
 
     (define (find-library name curr-lib)
-      (or (and (member name (library-defines curr-lib)) curr-lib)
+      (or (and (assoc name (library-defines curr-lib)) curr-lib)
           (find (lambda (lib) (member name (library-exports lib)))
                 (library-imports curr-lib))))
 
