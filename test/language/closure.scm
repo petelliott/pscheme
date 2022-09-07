@@ -41,18 +41,18 @@
   (assert (equal? (c) 4))
   (assert (equal? (c) 5)))
 
-(define-test "mutable arg closures" SKIP
+(define-test "mutable arg closures"
   (define (ctr2 cnt)
     (lambda ()
       (set! cnt (+ cnt 1))
       cnt))
 
   (define c2 (ctr2 4))
-  (assert (equal? (c2) 1))
-  (assert (equal? (c2) 2))
-  (assert (equal? (c2) 3))
-  (assert (equal? (c2) 4))
-  (assert (equal? (c2) 5)))
+  (assert (equal? (c2) 5))
+  (assert (equal? (c2) 6))
+  (assert (equal? (c2) 7))
+  (assert (equal? (c2) 8))
+  (assert (equal? (c2) 9)))
 
 (define-test "mutable rest closure" SKIP
   (define (ctr2 . cnt)

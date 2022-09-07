@@ -213,6 +213,15 @@
            (vm-ever-set? (last ref))
            (vm-ever-enclosed? (last ref))))
 
+    (define (improper->proper lst)
+      (cond
+       ((null? lst) lst)
+       ((pair? lst)
+        (cons (car lst)
+              (improper->proper (cdr lst))))
+       (else
+        (list lst))))
+
     (define-pass box-sets (ref-scheme)
       (proc-toplevel
        ((define ,identifier ,expression) (ident expr)
@@ -228,13 +237,13 @@
             `(builtin set-cdr! (ref ,(ident)) ,(expr))
             `(set! ,(ident) ,(expr))))
 
-       ((lambda (,@identifier) ,@proc-toplevel) (args body)
+       ((lambda (,@box) ,@proc-toplevel) (args body)
         `(lambda (,@(args))
-           ,@(sloppy-map (lambda (arg)
-                       (if (should-box (unbox arg))
-                           `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
-                           `(begin)))
-                     (args 'raw))
+           ,@(map (lambda (arg)
+                    (if (should-box (unbox arg))
+                        `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
+                        `(begin)))
+                     (improper->proper (args 'raw)))
            ,@(body)))
 
        ((ref ,identifier) (identifier)
