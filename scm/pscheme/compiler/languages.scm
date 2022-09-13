@@ -16,7 +16,8 @@
           make-box
           box?
           unbox
-          ref-scheme)
+          ref-scheme
+          ir)
   (begin
 
     (define (unquoted-literal? form)
@@ -96,7 +97,7 @@
 
     (define (vm-span vm)
       (and (span? (vm-sym-span vm))
-           (vm-sym-span vm)))
+clo           (vm-sym-span vm)))
 
     ;; TODO: this is a really ugly hack
     (define-record-type box
@@ -128,5 +129,55 @@
          (ref ,identifier)
          (lambda (,@box) ,@proc-toplevel)
          (closure ,expression ,@identifier)))))
+
+    (define ir
+      (language
+       (symbol symbol?)
+       (number number?)
+       (any any?)
+       (string string?)
+       (program
+        (,@toplevel-def))
+       (library-name
+        (,@library-name-part))
+       (library-name-part
+        ,symbol
+        ,number)
+       (data-name
+        (,symbol ,symbol ,number)
+        (,symbol ,library-name ,symbol ,number))
+       (global-ref
+        (quote ,any)
+        (data ,@data-name))
+       (identifier
+        (local ,number)
+        (arg ,number)
+        (global ,library-name ,symbol)
+        (closure ,number)
+        (ffi ,symbol)
+        (tmp ,number))
+       (immediate
+        (quote ,any)
+        ,identifier)
+       (toplevel-def
+        (lambda ,data-name (,@identifier) ,any ,@instruction)
+        (data ,data-name ,@global-ref)
+        (define ,library-name ,symbol)
+        (entry main ,@instruction)
+        (entry ,library-name ,@instruction))
+       (instruction
+        (void ,op)
+        ((tmp ,number) ,op))
+       (op
+        (import ,library-name)
+        (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction))
+        (tag-data ,data-name)
+        (load-imm ,any)
+        (builtin ,symbol ,@identifier)
+        (set! ,identifier ,identifier)
+        (return ,identifier)
+        (closure ,identifier ,@identifier)
+        (closure-ref ,number)
+        (call ,identifier ,@identifier))))
 
     ))
