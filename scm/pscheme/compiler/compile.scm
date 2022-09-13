@@ -1,13 +1,15 @@
 (define-library (pscheme compiler compile)
   (import (scheme base)
           (scheme file)
+          (scheme write) ;; tmp
           (srfi 28)
           (pscheme string)
+          (pscheme formatter)
           (pscheme compiler arch)
           (pscheme compiler frontend)
+          (pscheme compiler middleend)
           (pscheme compiler codegen)
           (pscheme compiler options)
-          (pscheme compiler writeir)
           (pscheme compiler file)
           (only (gauche base) sys-system))
   (export compile-project
@@ -38,6 +40,17 @@
                             (string-join " " (linker-objs (linker-opts)))
                             outfile))))
 
+    (define (writeir ir port)
+      (parameterize ((current-output-port port))
+        (for-each (lambda (stmt)
+                    (sexp-format
+                     '((entry . 1)
+                       (lambda . 3))
+                     stmt)
+                    (newline)
+                    (newline))
+                  ir)))
+
     (define (writeir-for filename ir)
       (define irfile (string-append filename ".pir"))
       (when (option 'ir)
@@ -52,7 +65,8 @@
                            (lambda ()
                              (define program (read-file filename))
                              (define ir (strip-spans (map frontend program)))
-                             (writeir-for filename ir)
+                             (define ir2 (middleend ir program-or-lib))
+                             (writeir-for filename ir2)
                              (case program-or-lib
                                ((program) (codegen-main-file ir))
                                ((library) (codegen-library-file ir))
