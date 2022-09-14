@@ -3,7 +3,6 @@
           (scheme file)
           (srfi 1)
           (pscheme compiler compile)
-          (pscheme compiler arch)
           (pscheme string))
   (export library?
           library-name
@@ -71,7 +70,7 @@
 
     (define (compile-and-import name)
       (or (lookup-library name)
-          (compile-file (current-target) (library-filename name) 'library))
+          (compile-file (library-filename name) 'library))
       (add-library-import! (current-library) (lookup-library name)))
 
     (define (find-library name curr-lib)

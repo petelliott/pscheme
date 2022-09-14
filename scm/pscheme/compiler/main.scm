@@ -4,7 +4,7 @@
         (scheme write))
 
 (import (pscheme base)
-        (pscheme compiler arch x86_64)
+        (pscheme compiler backends llvm)
         (pscheme compiler compile)
         (pscheme compiler library)
         (pscheme compiler options))
@@ -26,6 +26,6 @@
                    opts)))
 
 (optionize ((ir (assoc-ref 'ir opts)))
-           (compile-project x86_64 (cadr (assoc 'rest opts))
+           (compile-project llvm (cadr (assoc 'rest opts))
                             (or (assoc-ref 'output opts) "a.out")
                             libs))

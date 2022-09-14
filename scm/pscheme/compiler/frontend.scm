@@ -4,7 +4,6 @@
           (srfi 1)
           (pscheme match)
           (pscheme compiler util)
-          (pscheme compiler arch)
           (pscheme compiler library)
           (pscheme compiler syntax)
           (pscheme compiler file)

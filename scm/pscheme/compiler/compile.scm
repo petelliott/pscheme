@@ -5,12 +5,11 @@
           (srfi 28)
           (pscheme string)
           (pscheme formatter)
-          (pscheme compiler arch)
           (pscheme compiler frontend)
           (pscheme compiler middleend)
-          (pscheme compiler codegen)
           (pscheme compiler options)
           (pscheme compiler file)
+          (pscheme compiler backend)
           (only (gauche base) sys-system))
   (export compile-project
           compile-file
@@ -36,9 +35,7 @@
     (define (linking-context outfile proc)
       (parameterize ((linker-opts (make-linker-options '())))
         (proc)
-        (sys-system (format "gcc -g -Og ~a -o ~a"
-                            (string-join " " (linker-objs (linker-opts)))
-                            outfile))))
+        ((backend-link (current-backend)) (linker-objs (linker-opts)) outfile)))
 
     (define (writeir ir port)
       (parameterize ((current-output-port port))
@@ -56,28 +53,20 @@
       (when (option 'ir)
         (call-with-output-file irfile
           (lambda (port)
-            (writeir ir port)))))
+            (writeir (strip-spans ir) port)))))
 
-    (define (compile-file target filename program-or-lib)
-      (define asmfile (string-append filename ".s"))
-      (define objfile (string-append filename ".o"))
-      (compile-environment asmfile target
-                           (lambda ()
-                             (define program (read-file filename))
-                             (define ir (strip-spans (map frontend program)))
-                             (define ir2 (middleend ir program-or-lib))
-                             (writeir-for filename ir2)
-                             (case program-or-lib
-                               ((program) (codegen-main-file ir))
-                               ((library) (codegen-library-file ir))
-                               (else (error "invalid argument to compile-file: " program-or-lib)))))
-      (sys-system (format "gcc -g -Og -c ~a -o ~a" asmfile objfile))
-      (add-linked-object objfile))
+    (define (compile-file filename program-or-lib)
+      (define program (read-file filename))
+      (define fir (map frontend program))
+      (define mir (middleend fir program-or-lib))
+      (writeir-for filename mir)
+      (add-linked-object ((backend-compile (current-backend)) mir filename)))
 
-    (define (compile-project target filename outfile linked-libs)
-      (linking-context outfile
-                       (lambda ()
-                         (for-each (lambda (lib) (add-linked-object lib)) linked-libs)
-                         (compile-file target filename 'program))))
+    (define (compile-project backend filename outfile linked-libs)
+      (parameterize ((current-backend backend))
+        (linking-context outfile
+                         (lambda ()
+                           (for-each (lambda (lib) (add-linked-object lib)) linked-libs)
+                           (compile-file filename 'program)))))
 
     ))
