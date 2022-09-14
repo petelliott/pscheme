@@ -7,6 +7,7 @@
           (pscheme match)
           (pscheme compiler util)
           (pscheme compiler languages)
+          (pscheme compiler file)
           (pscheme compiler nanopass)
           (pscheme compiler backend)
           (only (gauche base) sys-system))
@@ -104,7 +105,10 @@
     (define-pass llvm-codegen (ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
-        (f "define private i64 @~a(...) {\n" (data-name (dname 'raw)))
+        (f "define private i64 @~a([0 x i64]* %closure, i64 %nargs~a~a) {\n"
+           (data-name (dname 'raw))
+           (apply string-append (map (lambda (a) (format ", i64 ~a" a)) (strip-spans (args))))
+           (if (rest 'raw) ", ..." ""))
         (insts)
         (f "    ret i64 0\n}\n\n"))
        ((data ,data-name ,@any) (name contents)
@@ -126,7 +130,21 @@
        ((entry ,library-name ,@instruction) (lib insts)
         (f "define void @pscheme_entry_~a() {\n" (mangle-library (lib 'raw)))
         (insts)
-        (f "    ret void\n}\n\n"))))
+        (f "    ret void\n}\n\n")))
+
+      (identifier
+       ((local ,number) (n)
+        (format "%l~a" (n 'raw)))
+       ((arg ,number) (n)
+        (format "%a~a" (n 'raw)))
+       ((global ,library-name ,symbol) (l s)
+        (format "@~a" (mangle (l 'raw) (s 'raw))))
+       ((closure ,number) (n)
+        (n 'raw))
+       ((ffi ,symbol) (sym)
+        (format "@~a" (sym 'raw)))
+       ((tmp ,number) (n)
+        (format "%t~a" (n 'raw)))))
 
     (define (llvm-compile ir rootname)
       (define llfile (string-append rootname ".ll"))
