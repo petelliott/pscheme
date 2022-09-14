@@ -114,8 +114,8 @@
       (proc-toplevel
        ((begin ,@proc-toplevel) (stmts)
         (if (null? (stmts 'raw))
-            'undefined
-            (last (stmts 'raw))))
+            (emit-tmp-op '(load-special undefined))
+            (last (stmts))))
        ((define ,identifier ,expression) (ident expr)
         (if (is-syntax? 'global (ident 'raw))
             (with-toplevel (emit `(define ,@(cdr (ident 'raw))))))
@@ -124,8 +124,8 @@
       (expression
        ((begin ,@expression) (stmts)
         (if (null? (stmts 'raw))
-            'undefined
-            (last (stmts 'raw))))
+            (emit-tmp-op '(load-special undefined))
+            (last (stmts))))
        ((lambda (,@box) ,@proc-toplevel) (args body)
         (define name `(data none lambda ,((unique))))
         (with-toplevel
