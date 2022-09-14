@@ -3,6 +3,7 @@
           (scheme file)
           (scheme write)
           (srfi 28)
+          (srfi 1)
           (pscheme string)
           (pscheme match)
           (pscheme compiler util)
@@ -10,9 +11,57 @@
           (pscheme compiler file)
           (pscheme compiler nanopass)
           (pscheme compiler backend)
+          (pscheme compiler library)
           (only (gauche base) sys-system))
   (export llvm)
   (begin
+
+    ;; declaration generation
+
+    (define declared (make-parameter '()))
+    (define defined (make-parameter '()))
+    (define entrypoints (make-parameter '()))
+
+    (define (do-define name)
+      (defined (cons name (defined))))
+
+    (define (do-declare name)
+      (declared (cons name (declared))))
+
+    (define (do-entrypoint name)
+      (entrypoints (cons name (entrypoints))))
+
+    (define-pass llvm-declare-extern-pass (ir)
+      (toplevel-def
+       ((define ,library-name ,symbol) (lname sym)
+        (do-define (list (lname 'raw) (sym 'raw)))))
+
+      (op
+       ((import ,library-name) (lname)
+        (do-entrypoint (lname 'raw))))
+
+      (identifier
+       ((global ,library-name ,symbol) (lname sym)
+        (do-declare (list (lname 'raw) (sym 'raw))))))
+
+    (define (llvm-declare-extern ir)
+      (parameterize ((declared '())
+                     (defined '())
+                     (entrypoints '()))
+        (llvm-declare-extern-pass ir)
+        (for-each (lambda (lib)
+                    (f "declare void @pscm_entry_~a()\n" (mangle-library lib)))
+                  (entrypoints))
+        (f "\n")
+        (for-each (lambda (decl)
+                    (unless (member decl (defined))
+                      (f "@~a = external global i64\n" (apply mangle decl))))
+                  (delete-duplicates (declared)))
+        (f "\n")))
+
+    ;; codegen
+
+    (define word-size 8)
 
     (define ll-port (make-parameter #f))
     (define (f str . rest)
@@ -70,9 +119,9 @@
     (define (data-name value)
       (match value
        ((data ,type ,key ,number)
-        (format "pscheme_~a_~a" key number))
+        (format "pscm_~a_~a" key number))
        ((data ,type ,library-name ,key ,number)
-        (format "pscheme_~a_~a_~a" (mangle-library library-name) key number))))
+        (format "pscm_~a_~a_~a" (mangle-library library-name) key number))))
 
     (define (data-lltype data)
       (if (string? (car data))
@@ -88,7 +137,7 @@
        ((char? value) (tag-number (char->integer value) PSCM-T-CHAR))
        ((null? value) (tag-number PSCM-S-NIL PSCM-T-SINGLETON))
        ((eq? value #f) (tag-number PSCM-S-F PSCM-T-SINGLETON))
-       ((eq? value #t) (tag-number PSCM-S-t PSCM-T-SINGLETON))
+       ((eq? value #t) (tag-number PSCM-S-T PSCM-T-SINGLETON))
        ((is-syntax? 'data value)
         (if (eq? (cadr value) 'none)
             (format "ptrtoint (%~a_typ* @~a to i64)" (data-name value) (data-name value))
@@ -102,14 +151,24 @@
                       (else (error "can't tag data type" (cadr value)))))))
        (else (error "can't represent value" value))))
 
+    (define current-reg (make-parameter #f))
+    (define (preop)
+      (if (current-reg)
+          (f "    ~a = " (current-reg))
+          (f "    ")))
+
     (define-pass llvm-codegen (ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
+        (f "%~a_typ = type i64 ([0 x i64]*, i64~a~a)\n"
+           (data-name (dname 'raw))
+           (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
+           (if (rest 'raw) ", ..." ""))
         (f "define private i64 @~a([0 x i64]* %closure, i64 %nargs~a~a) {\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64 ~a" a)) (strip-spans (args))))
            (if (rest 'raw) ", ..." ""))
-        (insts)
+        ;(insts)
         (f "    ret i64 0\n}\n\n"))
        ((data ,data-name ,@any) (name contents)
         (define c (contents 'raw))
@@ -128,7 +187,7 @@
         (insts)
         (f "    ret i32 0\n}\n\n"))
        ((entry ,library-name ,@instruction) (lib insts)
-        (f "define void @pscheme_entry_~a() {\n" (mangle-library (lib 'raw)))
+        (f "define void @pscm_entry_~a() {\n" (mangle-library (lib 'raw)))
         (insts)
         (f "    ret void\n}\n\n")))
 
@@ -144,14 +203,67 @@
        ((ffi ,symbol) (sym)
         (format "@~a" (sym 'raw)))
        ((tmp ,number) (n)
-        (format "%t~a" (n 'raw)))))
+        (format "%t~a" (n 'raw))))
+
+      (instruction
+       ((void ,op) (op)
+        (parameterize ((current-reg #f))
+          (op)))
+       ((,identifier ,op) (ident op)
+        (parameterize ((current-reg (ident)))
+          (op))))
+
+      (op
+       ((import ,library-name) (lname)
+        (preop)
+        (f "call void() @pscm_entry_~a()\n" (mangle-library (lname 'raw))))
+       ((load-imm ,any) (val)
+        (preop)
+        (f "add i64 ~a, 0\n" (data-repr (val 'raw))))
+       ((return ,identifier) (ident)
+        (preop)
+        (f "ret i64 ~a\n" (ident 'raw)))
+       ((closure ,identifier ,@identifier) (fn params)
+        (define fun (fn))
+        (define args (params))
+        (define u (unique))
+        (f "    %closure_~a = call i64*(i64) @pscheme_allocate_block(i64 ~a)\n"
+           u
+           (* word-size (+ 1 (length args))))
+        (f "    %closure_~a_fn = getelementptr i64, i64* %closure_~a, i64 0\n" u u)
+        (f "    store i64 ~a, i64* %closure_~a_fn\n" fun u)
+        (for-each
+         (lambda (param n)
+           (f "    %closure_~a_~a = getelementptr i64, i64* %closure_~a, i64 0\n" u n u)
+           (f "    store i64 ~a, i64* %closure_~a_~a\n" param u n))
+         args
+         (iota (length args)))
+        (f "    %tagged_closure_~a = ptrtoint i64* %closure_~a to i64\n" u u)
+        (preop)
+        (f "add i64 %tagged_closure_~a, ~a\n" u PSCM-T-CLOSURE))
+       ((closure-ref (closure ,number)) (n)
+        (define u (unique))
+        (f "    %cref_~a = getelementptr i64, i64* %closure, i64 ~a\n" u (+ (n 'raw) 1))
+        (preop)
+        (f "load i64, i64* %cref_~a\n" u))
+       ((global-ref ,identifier) (ident)
+        (preop)
+        (f "load i64, i64* ~a\n" (strip-spans (ident))))
+       ((global-set! ,identifier ,identifier) (name value)
+        (preop)
+        (f "store i64 ~a, i64* ~a\n" (strip-spans (value)) (strip-spans (name))))))
+
+
 
     (define (llvm-compile ir rootname)
       (define llfile (string-append rootname ".ll"))
       (define objfile (string-append rootname ".o"))
       (call-with-output-file llfile
         (lambda (port)
-          (parameterize ((ll-port port))
+          (parameterize ((ll-port port)
+                         (current-unique 0))
+            (f "declare i64* @pscheme_allocate_block(i64)\n\n")
+            (llvm-declare-extern ir)
             (llvm-codegen ir))))
       (sys-system (format "llc -filetype=obj ~a -o ~a" llfile objfile))
       objfile)

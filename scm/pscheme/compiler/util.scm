@@ -8,7 +8,9 @@
           any?
           mcons
           sloppy-map
-          recursive-sloppy-map)
+          recursive-sloppy-map
+          current-unique
+          unique)
   (begin
 
     (define (is-syntax? sym form)
@@ -67,5 +69,13 @@
        (else
         (cons (recursive-sloppy-map proc (car lst))
               (recursive-sloppy-map proc (cdr lst))))))
+
+    ;;; utils
+
+    (define current-unique (make-parameter 0))
+
+    (define (unique)
+      (current-unique (+ 1 (current-unique)))
+      (current-unique))
 
     ))

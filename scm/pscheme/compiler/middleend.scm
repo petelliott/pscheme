@@ -8,16 +8,6 @@
   (export middleend)
   (begin
 
-    ;;; utils
-
-    (define (make-unique)
-      (define n 0)
-      (lambda ()
-        (set! n (+ n 1))
-        n))
-
-    (define unique (make-parameter (make-unique)))
-
     ;;; stuff for unpacking trees
 
     (define lb-param (make-parameter '()))
@@ -74,22 +64,22 @@
        ((null? args) #f)))
 
     (define (emit-tmp-op op)
-      (define tmp `(tmp ,((unique))))
+      (define tmp `(tmp ,(unique)))
       (emit `(,tmp ,op))
       tmp)
 
     (define (literal value)
       (cond
        ((string? value)
-        (let ((name `(data string string ,((unique)))))
+        (let ((name `(data string string ,(unique))))
           (with-toplevel (emit `(data ,name ,value)))
           name))
        ((symbol? value)
-        (let ((name `(data symbol symbol ,((unique)))))
+        (let ((name `(data symbol symbol ,(unique))))
           (with-toplevel (emit `(data ,name ,(symbol->string value))))
           name))
        ((pair? value)
-        (let ((name `(data pair pair ,((unique)))))
+        (let ((name `(data pair pair ,(unique))))
           (with-toplevel (emit `(data ,name ,(literal (car value)) ,(literal (cdr value)))))
           name))
        (else value)))
@@ -118,8 +108,10 @@
             (last (stmts))))
        ((define ,identifier ,expression) (ident expr)
         (if (is-syntax? 'global (ident 'raw))
-            (with-toplevel (emit `(define ,@(cdr (ident 'raw))))))
-        (emit `(void (set! ,(ident) ,(expr))))))
+            (begin
+              (with-toplevel (emit `(define ,@(cdr (ident 'raw)))))
+              (emit `(void (global-set! ,(ident) ,(expr)))))
+            (emit `(void (set! ,(ident) ,(expr)))))))
 
       (expression
        ((begin ,@expression) (stmts)
@@ -127,11 +119,11 @@
             (emit-tmp-op '(load-special undefined))
             (last (stmts))))
        ((lambda (,@box) ,@proc-toplevel) (args body)
-        (define name `(data none lambda ,((unique))))
+        (define name `(data none lambda ,(unique)))
         (with-toplevel
          (emit `(lambda ,name ,(normal-args (args 'raw)) ,(rest-arg (args 'raw))
                         ,@(with-list-block (emit `(void (return ,(last (body)))))))))
-        (emit-tmp-op `(tag-data ,name)))
+        (emit-tmp-op `(load-imm ,name)))
        ((if ,expression ,expression ,expression) (c tbranch fbranch)
         (define treg #f)
         (define tinsts (with-list-block (set! treg (tbranch))))
@@ -144,10 +136,7 @@
             (emit-tmp-op `(set! ,(ident) ,(expr)))))
        ((quote ,any) (val)
         (define data (literal (val 'raw)))
-        (emit-tmp-op
-         (if (is-syntax? 'data data)
-             `(tag-data ,data)
-             `(load-imm ,data))))
+        (emit-tmp-op `(load-imm ,data)))
        ((builtin ,symbol ,@expression) (sym args)
         (emit-tmp-op `(builtin ,(sym) ,@(args))))
        ((ref ,identifier) (ident)
@@ -178,7 +167,7 @@
       (define inner
         (concat-passes
          (lambda (p) (irconvert p program-or-lib))))
-      (parameterize ((unique (make-unique)))
+      (parameterize ((current-unique 0))
         (inner prog)))
 
     ))
