@@ -5,10 +5,12 @@
   (begin
 
     (define (string-join sep strings)
-      (apply string-append
-             (cons (car strings)
-                   (map (lambda (str) (string-append sep str))
-                        (cdr strings)))))
+      (if (null? strings)
+          ""
+          (apply string-append
+                 (car strings)
+                 (map (lambda (str) (string-append sep str))
+                      (cdr strings)))))
 
     (define (string-starts-with str needle)
       (define slen (string-length str))
