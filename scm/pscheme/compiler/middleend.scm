@@ -139,7 +139,9 @@
         (define finsts (with-list-block (set! freg (fbranch))))
         (emit-tmp-op `(if ,(c) ,treg ,tinsts ,freg ,finsts)))
        ((set! ,identifier ,expression) (ident expr)
-        (emit-tmp-op `(set! ,(ident) ,(expr))))
+        (if (is-syntax? 'global (ident 'raw))
+            (emit-tmp-op `(global-set! ,(ident) ,(expr)))
+            (emit-tmp-op `(set! ,(ident) ,(expr)))))
        ((quote ,any) (val)
         (define data (literal (val 'raw)))
         (emit-tmp-op
@@ -149,9 +151,13 @@
        ((builtin ,symbol ,@expression) (sym args)
         (emit-tmp-op `(builtin ,(sym) ,@(args))))
        ((ref ,identifier) (ident)
-        (if (is-syntax? 'closure (ident 'raw))
-            (emit-tmp-op `(closure-ref ,(ident)))
-            (ident)))
+        (cond
+         ((is-syntax? 'closure (ident 'raw))
+          (emit-tmp-op `(closure-ref ,(ident))))
+         ((is-syntax? 'global (ident 'raw))
+          (emit-tmp-op `(global-ref ,(ident))))
+         (else
+          (ident))))
        ((closure ,expression ,@identifier) (expr idents)
         (emit-tmp-op `(closure ,(expr) ,@(idents))))
        ((call ,expression ,@expression) (fn args)
