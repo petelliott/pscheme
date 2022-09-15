@@ -157,18 +157,20 @@
           (f "    ~a = " (current-reg))
           (f "    ")))
 
+    (define last-label (make-parameter #f))
+
     (define-pass llvm-codegen (ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
-        (f "%~a_typ = type i64 ([0 x i64]*, i64~a~a)\n"
+        (f "%~a_typ = type i64 (i64*, i64~a~a)\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
            (if (rest 'raw) ", ..." ""))
-        (f "define private i64 @~a([0 x i64]* %closure, i64 %nargs~a~a) {\n"
+        (f "define private i64 @~a(i64* %closure, i64 %nargs~a~a) {\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64 ~a" a)) (strip-spans (args))))
            (if (rest 'raw) ", ..." ""))
-        ;(insts)
+        (insts)
         (f "    ret i64 0\n}\n\n"))
        ((data ,data-name ,@any) (name contents)
         (define c (contents 'raw))
@@ -217,12 +219,41 @@
        ((import ,library-name) (lname)
         (preop)
         (f "call void() @pscm_entry_~a()\n" (mangle-library (lname 'raw))))
+       ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction)) (condition tphi tbranch fphi fbranch)
+        (define u (unique))
+        (define tlabel #f)
+        (define flabel #f)
+        (f "    %ifcond_~a = icmp ne i64 ~a, ~a\n"
+           u (strip-spans (condition)) (data-repr #f))
+        (f "    br i1 %ifcond_~a, label %iftrue_~a, label %iffalse_~a\n" u u u)
+        (f "iftrue_~a:\n" u)
+        (set! tlabel
+              (parameterize ((last-label (format "iftrue_~a" u)))
+                (tbranch)
+                (last-label)))
+        (f "    br label %ifend_~a\n" u)
+        (f "iffalse_~a:\n" u)
+        (set! flabel
+              (parameterize ((last-label (format "iffalse_~a" u)))
+                (fbranch)
+                (last-label)))
+        (f "    br label %ifend_~a\n" u)
+        (last-label (format "ifend_~a" u))
+        (f "ifend_~a:\n" u)
+        (preop)
+        (f "phi i64 [ ~a, %~a ], [ ~a, %~a ]\n"
+           (strip-spans (tphi)) tlabel (strip-spans (fphi)) flabel))
        ((load-imm ,any) (val)
         (preop)
         (f "add i64 ~a, 0\n" (data-repr (val 'raw))))
+       ((load-special ,symbol) (sym)
+        (preop)
+        (case (sym 'raw)
+          ((unspecified)
+           (f "add i64 ~a, 0\n" (tag-number PSCM-T-SINGLETON PSCM-S-UNSPECIFIED)))))
        ((return ,identifier) (ident)
         (preop)
-        (f "ret i64 ~a\n" (ident 'raw)))
+        (f "ret i64 ~a\n" (strip-spans (ident))))
        ((closure ,identifier ,@identifier) (fn params)
         (define fun (fn))
         (define args (params))
@@ -251,7 +282,21 @@
         (f "load i64, i64* ~a\n" (strip-spans (ident))))
        ((global-set! ,identifier ,identifier) (name value)
         (preop)
-        (f "store i64 ~a, i64* ~a\n" (strip-spans (value)) (strip-spans (name))))))
+        (f "store i64 ~a, i64* ~a\n" (strip-spans (value)) (strip-spans (name))))
+       ((call ,identifier ,@identifier) (fn args)
+        (define u (unique))
+        (define args2 (strip-spans (args)))
+        (f "    %call_~a_a = lshr i64 ~a, 4\n" u (strip-spans (fn)))
+        (f "    %call_~a_b = shl i64 %call_~a_a, 4\n" u u)
+        (f "    %call_~a_clos = inttoptr i64 %call_~a_b to i64*\n" u u)
+        (f "    %call_~a_fnint = load i64, i64* %call_~a_clos\n" u u)
+        (f "    %call_~a_fn = inttoptr i64 %call_~a_fnint to i64(i64*, i64, ...)*\n" u u)
+        (preop)
+        (f "call i64(i64*, i64, ...) %call_~a_fn(i64* %call_~a_clos, i64 ~a~a)\n" u u
+           (length args2)
+           (apply string-append (map (lambda (a) (format ", i64 ~a" a)) args2))))
+
+       ))
 
 
 
