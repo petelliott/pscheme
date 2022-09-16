@@ -244,7 +244,7 @@
         (nameof `(local ,(n 'raw)) (renames)))
        ((arg rest) ()
         (nameof `(arg rest) (renames)))
-       ((arg rest) (n)
+       ((arg ,number) (n)
         (nameof `(arg ,(n 'raw)) (renames)))))
 
     (define (middleend prog program-or-lib)
