@@ -91,7 +91,7 @@
               (map (lambda (c)
                      (format "\\~a" (zero-pad (number->string (char->integer c) 16) 2)))
                    (string->list str)))
-       "\""))
+       "\\00\""))
 
     (define-syntax enum
       (syntax-rules ()
@@ -137,7 +137,7 @@
 
     (define (data-lltype data)
       (if (string? (car data))
-          (format "type [~a x i8]" (string-length (car data)))
+          (format "type [~a x i8]" (+ 1 (string-length (car data))))
           (format "type {~a}"
                   (string-join
                    ", "
@@ -186,7 +186,7 @@
            (apply string-append (map (lambda (a) (format ", i64 ~a" a)) (strip-spans (args))))
            (if (rest 'raw) ", ..." ""))
         (insts)
-        (f "    ret i64 0\n}\n\n"))
+        (f "}\n\n"))
        ((data ,data-name ,@any) (name contents)
         (define c (contents 'raw))
         (define n (data-name (name 'raw)))
