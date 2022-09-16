@@ -4,6 +4,7 @@
           (scheme write)
           (srfi 28)
           (srfi 1)
+          (pscheme base)
           (pscheme string)
           (pscheme match)
           (pscheme compiler util)
@@ -21,6 +22,7 @@
     (define declared (make-parameter '()))
     (define defined (make-parameter '()))
     (define entrypoints (make-parameter '()))
+    (define ffi (make-parameter '()))
 
     (define (do-define name)
       (defined (cons name (defined))))
@@ -30,6 +32,9 @@
 
     (define (do-entrypoint name)
       (entrypoints (cons name (entrypoints))))
+
+    (define (do-ffi name)
+      (ffi (cons name (ffi))))
 
     (define-pass llvm-declare-extern-pass (ir)
       (toplevel-def
@@ -42,13 +47,19 @@
 
       (identifier
        ((global ,library-name ,symbol) (lname sym)
-        (do-declare (list (lname 'raw) (sym 'raw))))))
+        (do-declare (list (lname 'raw) (sym 'raw))))
+       ((ffi ,symbol) (sym)
+        (do-ffi (sym 'raw)))))
 
     (define (llvm-declare-extern ir)
       (parameterize ((declared '())
                      (defined '())
                      (entrypoints '()))
         (llvm-declare-extern-pass ir)
+        (for-each (lambda (name)
+                    (f "declare i64 @~a(...)\n" name))
+                  (ffi))
+        (f "\n")
         (for-each (lambda (lib)
                     (f "declare void @pscm_entry_~a()\n" (mangle-library lib)))
                   (entrypoints))
@@ -159,6 +170,9 @@
 
     (define last-label (make-parameter #f))
 
+    (define (ret-unspec)
+      (f "add i64 ~a, 0\n" (tag-number PSCM-T-SINGLETON PSCM-S-UNSPECIFIED)))
+
     (define-pass llvm-codegen (ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
@@ -181,7 +195,7 @@
         (if (string? (car c))
             (f "c~a" (string->asm (car c)))
             (f "{~a}" (string-join ", " (map (lambda (d) (format "i64 ~a" (data-repr d))) c))))
-        (f "\n\n"))
+        (f ", align 16\n\n"))
        ((define ,library-name ,symbol) (lib sym)
         (f "@~a = global i64 0\n\n" (mangle (lib 'raw) (sym 'raw))))
        ((entry main ,@instruction) (insts)
@@ -250,7 +264,15 @@
         (preop)
         (case (sym 'raw)
           ((unspecified)
-           (f "add i64 ~a, 0\n" (tag-number PSCM-T-SINGLETON PSCM-S-UNSPECIFIED)))))
+           (ret-unspec))))
+       ((builtin ,symbol ,@identifier) (sym args)
+        (define fun (assoc-ref (sym 'raw) builtins))
+        (if fun
+            (begin
+              (f "    ; begin builtin ~a\n" (sym 'raw))
+              (apply fun (strip-spans (args)))
+              (f "    ; end builtin ~a\n" (sym 'raw)))
+            (error "no builtin" (sym 'raw))))
        ((return ,identifier) (ident)
         (preop)
         (f "ret i64 ~a\n" (strip-spans (ident))))
@@ -298,7 +320,162 @@
 
        ))
 
+    (define builtins '())
+    (define-syntax define-builtin
+      (syntax-rules ()
+        ((_ (name . args) body ...)
+         (set! builtins
+               (cons (cons 'name (lambda args body ...))
+                     builtins)))))
 
+    (define (icmp type a b)
+      (define u (unique))
+      (f "    %bcmp_~a_a = icmp ~a i64 ~a, ~a\n" u type a b)
+      ;; convert i1 to pscheme boolean without branching
+      (f "    %bcmp_~a_b = zext i1 %bcmp_~a_a to i64\n" u u)
+      (f "    %bcmp_~a_c = shl i64 16, %bcmp_~a_b\n" u u)
+      (preop)
+      (f "or i64 %bcmp_~a_c, ~a\n" u PSCM-T-SINGLETON))
+
+    (define (fixnum-binop op a b)
+      (define u (unique))
+      (f "    %fbin_~a_a = ashr i64 ~a, 4\n" u a)
+      (f "    %fbin_~a_b = ashr i64 ~a, 4\n" u b)
+      (f "    %fbin_~a_r = ~a i64 %fbin_~a_a, %fbin_~a_b\n" u op u u)
+      (preop)
+      (f "shl i64 %fbin_~a_r, 4\n" u))
+
+    (define (tag-typep obj tag)
+      (define u (unique))
+      (f "    %typep_~a_tag = and i64 ~a, 15\n" u obj)
+      (f "    %typep_~a_cmp = icmp eq i64 %typep_~a_tag, ~a" u u tag)
+      ;; convert i1 to pscheme boolean without branching
+      (f "    %typep_~a_b0 = zext i1 %typep_~a_cmp to i64\n" u u)
+      (f "    %typep_~a_b1 = shl i64 16, %typep_~a_b0\n" u u)
+      (preop)
+      (f "or i64 %typep_~a_b1, ~a\n" u PSCM-T-SINGLETON))
+
+    (define-builtin (eq? a b) (icmp 'eq a b))
+    (define-builtin (fixnum< a b) (icmp 'slt a b))
+    (define-builtin (fixnum<= a b) (icmp 'sle a b))
+    (define-builtin (fixnum+ a b) (fixnum-binop 'add a b))
+    (define-builtin (fixnum* a b) (fixnum-binop 'mul a b))
+    (define-builtin (fixnum- a b) (fixnum-binop 'sub a b))
+    (define-builtin (fixnum/ a b) (fixnum-binop 'sdiv a b))
+    (define-builtin (fixnum-remainder a b) (fixnum-binop 'srem a b))
+    (define-builtin (fixnum? obj) (tag-typep obj PSCM-T-FIXNUM))
+    (define-builtin (pair? obj) (tag-typep obj PSCM-T-CONS))
+    (define-builtin (string? obj) (tag-typep obj PSCM-T-STRING))
+    (define-builtin (symbol? obj) (tag-typep obj PSCM-T-SYMBOL))
+    (define-builtin (char? obj) (tag-typep obj PSCM-T-CHAR))
+    (define-builtin (procedure? obj) (tag-typep obj PSCM-T-CLOSURE))
+
+    (define-builtin (cons a d)
+      (define u (unique))
+      (f "    %cons_~a_ptr = call i64*() @pscheme_allocate_cell()\n" u)
+      (f "    %cons_~a_car = getelementptr i64, i64* %cons_~a_ptr, i64 0\n" u u)
+      (f "    store i64 ~a, i64* %cons_~a_car\n" a u)
+      (f "    %cons_~a_cdr = getelementptr i64, i64* %cons_~a_ptr, i64 1\n" u u)
+      (f "    store i64 ~a, i64* %cons_~a_cdr\n" d u)
+      (f "    %cons_~a_int = ptrtoint i64* %cons_~a_ptr to i64\n" u u)
+      (preop)
+      (f "or i64 %cons_~a_int, ~a\n" u PSCM-T-CONS))
+
+    (define (builtin-car/cdr off pair)
+      (define u (unique))
+      (f "    %cadr_~a_int0 = lshr i64 ~a, 4\n" u pair)
+      (f "    %cadr_~a_int = shl i64 %cadr_~a_int0, 4\n" u u)
+      (f "    %cadr_~a_cptr = inttoptr i64 %cadr_~a_int to i64*\n" u u)
+      (f "    %cadr_~a_ptr = getelementptr i64, i64* %cadr_~a_cptr, i64 ~a\n" u u off)
+      (preop)
+      (f "load i64, i64* %cadr_~a_ptr\n" u))
+    (define-builtin (car pair) (builtin-car/cdr 0 pair))
+    (define-builtin (cdr pair) (builtin-car/cdr 1 pair))
+
+    (define (builtin-set-car/cdr! off pair value)
+      (define u (unique))
+      (f "    %cadr_~a_int0 = lshr i64 ~a, 4\n" u pair)
+      (f "    %cadr_~a_int = shl i64 %cadr_~a_int0, 4\n" u u)
+      (f "    %cadr_~a_cptr = inttoptr i64 %cadr_~a_int to i64*\n" u u)
+      (f "    %cadr_~a_ptr = getelementptr i64, i64* %cadr_~a_cptr, i64 ~a\n" u u off)
+      (f "    store i64 ~a, i64* %cadr_~a_ptr\n" value u)
+      (preop)
+      (ret-unspec))
+    (define-builtin (set-car! pair value) (builtin-set-car/cdr! 0 pair value))
+    (define-builtin (set-cdr! pair value) (builtin-set-car/cdr! 1 pair value))
+
+    (define (builtin-alloc len tag)
+      (define u (unique))
+      (f "    %alloc_~a_ptr = call i64*(i64) @pscheme_allocate_block(~a)\n" u len)
+      (preop)
+      (f "or i64 %alloc_~a_ptr, ~a\n" u tag))
+
+    (define-builtin (alloc-string len) (builtin-alloc len PSCM-T-STRING))
+
+    (define-builtin (string-ref str off)
+      (define u (unique))
+      (f "    %sr_~a_sint0 = lshr ~a, 4\n" u str)
+      (f "    %sr_~a_sint = shl %sr_~a_sint0, 4\n" u u)
+      (f "    %sr_~a_sptr = inttoptr i64 %sr_~a_sint to i8*\n" u u)
+      (f "    %sr_~a_off = ashr ~a, 4\n" u off)
+      (f "    %sr_~a_cptr = getelementptr i8, i8* %sr_~a_sptr, i64 %sr_~a_off" u u u)
+      (f "    %sr_~a_c = load i8, i8* %sr_~a_cptr\n" u u)
+      (f "    %sr_~a_cint0 = zext i8 %sr_~a_c to i64\n" u u)
+      (f "    %sr_~a_cint = shl i64 %rs_~a_cint0, 4\n" u u)
+      (preop)
+      (f "or i64 %sr_~a_cint, ~a" u PSCM-T-CHAR))
+
+    (define-builtin (string-set! str off ch)
+      (define u (unique))
+      (f "    %sr_~a_sint0 = lshr ~a, 4\n" u str)
+      (f "    %sr_~a_sint = shl %sr_~a_sint0, 4\n" u u)
+      (f "    %sr_~a_sptr = inttoptr i64 %sr_~a_sint to i8*\n" u u)
+      (f "    %sr_~a_off = ashr ~a, 4\n" u off)
+      (f "    %sr_~a_cptr = getelementptr i8, i8* %sr_~a_sptr, i64 %sr_~a_off" u u u)
+      (f "    %sr_~a_c0 = ashr ~a, 4\n" u ch)
+      (f "    %sr_~a_c = trunc i64 %sr_~a_c0 to i8\n" u ch)
+      (f "    store i8 %sr_~a_c, i8* %sr_~a_cptr" u u)
+      (preop)
+      (ret-unspec))
+
+    ;; TODO: strcpy
+
+    (define (builtin-num->ffi n)
+      (preop)
+      (f "ashr i64 ~a, 4\n"n ))
+
+    (define (builtin-ptr->ffi p)
+      (define u (unique))
+      (f "    %ptr_~a = lshr i64 ~a, 4\n" u p)
+      (preop)
+      (f "shl i64 %ptr_~a, 4\n" u))
+
+    (define-builtin (fixnum->ffi n) (builtin-num->ffi n))
+    (define-builtin (string->ffi n) (builtin-ptr->ffi n))
+    (define-builtin (char->ffi n) (builtin-num->ffi n))
+
+    (define (builtin-ffi->num n tag)
+      (define u (unique))
+      (f "    %num_~a = shl i64 ~a, 4\n" u n)
+      (preop)
+      (f "or i64 %num_~a, ~a" u tag))
+
+    (define-builtin (ffi->fixnum n) (builtin-ffi->num n PSCM-T-FIXNUM))
+    (define-builtin (ffi->char n) (builtin-ffi->num n PSCM-T-CHAR))
+
+    (define-builtin (ffi-call fn . args)
+      (preop)
+      (f "call i64(...) ~a(~a)\n" fn
+         (string-join ", " (map (lambda (a) (format "i64 ~a" a)) args))))
+
+    (define (retag n tag)
+      (define u (unique))
+      (f "    %retag_~a = lshr i64 ~a, 4\n" u n)
+      (preop)
+      (f "or i64 %retag_~a, ~a\n" u tag))
+
+    (define-builtin (integer->char i) (retag i PSCM-T-CHAR))
+    (define-builtin (char->integer i) (retag i PSCM-T-FIXNUM))
 
     (define (llvm-compile ir rootname)
       (define llfile (string-append rootname ".ll"))
@@ -307,17 +484,17 @@
         (lambda (port)
           (parameterize ((ll-port port)
                          (current-unique 0))
+            (f "declare i64* @pscheme_allocate_cell()\n")
             (f "declare i64* @pscheme_allocate_block(i64)\n\n")
             (llvm-declare-extern ir)
             (llvm-codegen ir))))
-      (sys-system (format "llc -filetype=obj ~a -o ~a" llfile objfile))
+      (sys-system (format "clang -g -c ~a -o ~a" llfile objfile))
       objfile)
 
     (define (llvm-link objs outfile)
-      (sys-system (format "clang ~a -o ~a"
+      (sys-system (format "clang -g ~a -o ~a"
                           (string-join " " objs)
                           outfile)))
-
 
     (define llvm (make-backend 'llvm llvm-compile llvm-link))
 
