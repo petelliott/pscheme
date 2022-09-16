@@ -1,18 +1,18 @@
 #include "calling.h"
 #include "object.h"
-#include <assert.h>
+#include <stdarg.h>
 
-// this function makes heavy use of the systemv calling convention
-pscheme_t pscm_internal_rest(size_t normal_args) {
-    pscheme_start();
+pscheme_t pscheme_internal_rest(va_list ap, size_t toget) {
+    pscheme_t args[toget];
 
-    size_t nargs = pscheme_nargs() - 3;
-    assert(nargs >= normal_args);
-
-    pscheme_t list = PSCM_NIL;
-    for (int i = nargs - 1; i >= (int)normal_args; --i) {
-        list = pscheme_cons(pscheme_arg(i), list);
+    for (size_t i = 0; i < toget; ++i) {
+        args[i] = va_arg(ap, pscheme_t);
     }
 
-    pscheme_return(list);
+    pscheme_t list = PSCM_NIL;
+    for (long int i = toget - 1; i >= 0; --i) {
+        list = pscheme_cons(args[i], list);
+    }
+
+    return list;
 }

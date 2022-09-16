@@ -1,7 +1,6 @@
 (define-library (pscheme compiler compile)
   (import (scheme base)
           (scheme file)
-          (scheme write) ;; tmp
           (srfi 28)
           (pscheme string)
           (pscheme formatter)

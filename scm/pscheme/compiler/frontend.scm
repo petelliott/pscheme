@@ -96,10 +96,7 @@
     (define current-frame (make-parameter '()))
 
     (define (new-frame args rest-arg parent)
-      (make-frame args rest-arg
-                  (if rest-arg '((#f)) '())
-                  '()
-                  parent))
+      (make-frame args rest-arg '() '() parent))
 
     (define (define-var! sym)
       (if (not (null? (current-frame)))
@@ -131,10 +128,10 @@
             (pscm-err "undefined variable ~a" sym)))
        ((and (frame-rest-arg frame)
              (eq? sym (vm-sym (frame-rest-arg frame))))
-        `(stack 0 ,(frame-rest-arg frame)))
+        `(arg rest ,(frame-rest-arg frame)))
        ((member sym (frame-locals frame) vm-cmp) =>
         (lambda (m)
-          `(stack ,(- (length m) 1) ,(car m))))
+          `(local ,(- (length m) 1) ,(car m))))
        ((member sym (frame-args frame) vm-cmp)  =>
         (lambda (m)
           `(arg ,(- (length m) 1) ,(car m))))
@@ -177,9 +174,8 @@
               (lambda ,(sloppy-map (lambda (var) (make-box (lookup-var! var))) arglist)
                 (begin
                   ,@(if (frame-rest-arg (current-frame))
-                        `((accumulate-rest ,(length (frame-args (current-frame))) (stack 0)))
-                        '())
-                  (push-locals ,nlocals))
+                        `((accumulate-rest ,(length (frame-args (current-frame)))))
+                        '()))
                 ,@processed-body)
               ,@(reverse (frame-closure (current-frame)))))))
 
@@ -266,11 +262,13 @@
         (define b (body))
         `(lambda (,@(args))
            ,(car b) ;; make sure we accumulate the rest arguments before boxing them
-           ,@(map (lambda (arg)
-                    (if (should-box (unbox arg))
-                        `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
-                        `(begin)))
-                     (improper->proper (args 'raw)))
+           ,@(fold (lambda (arg prev)
+                     (if (should-box (unbox arg))
+                         (cons `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
+                               prev)
+                         prev))
+                   '()
+                   (improper->proper (args 'raw)))
            ,@(cdr b)))
 
        ((ref ,identifier) (identifier)

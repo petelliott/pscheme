@@ -41,8 +41,10 @@
 
     (define (rm-vm arg)
       (match arg
-       ((stack ,number ,var-metadata)
+       ((local ,number ,var-metadata)
         `(local ,number))
+       ((arg rest ,var-metadata)
+        `(arg rest))
        ((arg ,number ,var-metadata)
         `(arg ,number))
        ((closure ,number ,var-metadata)
@@ -86,8 +88,10 @@
 
     (define-pass irconvert1 (ref-scheme)
       (identifier
-       ((stack ,number ,var-metadata) (n v)
+       ((local ,number ,var-metadata) (n v)
         `(local ,(n)))
+       ((arg rest ,var-metadata) (v)
+        `(arg rest))
        ((arg ,number ,var-metadata) (n v)
         `(arg ,(n)))
        ((closure ,number ,var-metadata) (n v)
@@ -106,6 +110,8 @@
         (if (null? (stmts 'raw))
             (emit-tmp-op '(load-special unspecified))
             (last (stmts))))
+       ((accumulate-rest ,number) (n)
+        (emit `(void (accumulate-rest ,(n)))))
        ((define ,identifier ,expression) (ident expr)
         (if (is-syntax? 'global (ident 'raw))
             (begin

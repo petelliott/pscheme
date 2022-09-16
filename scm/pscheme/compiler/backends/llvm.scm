@@ -171,7 +171,7 @@
     (define last-label (make-parameter #f))
 
     (define (ret-unspec)
-      (f "add i64 ~a, 0\n" (tag-number PSCM-T-SINGLETON PSCM-S-UNSPECIFIED)))
+      (f "add i64 ~a, 0\n" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON)))
 
     (define-pass llvm-codegen (ir)
       (toplevel-def
@@ -210,6 +210,8 @@
       (identifier
        ((local ,number) (n)
         (format "%l~a" (n 'raw)))
+       ((arg rest) ()
+        "%restarg")
        ((arg ,number) (n)
         (format "%a~a" (n 'raw)))
        ((global ,library-name ,symbol) (l s)
@@ -230,6 +232,12 @@
           (op))))
 
       (op
+       ((accumulate-rest ,number) (n)
+        (f "    %valist = alloca %va_list\n")
+        (f "    call void @llvm.va_start(%va_list* %valist)\n")
+        (f "    %toget = sub i64 %nargs, ~a" (n 'raw))
+        (f "    %restarg = call i64 @pscheme_internal_rest(%va_list* %valist, i64 %toget)\n")
+        (f "    call void @llvm.va_end(%va_list* %valist)\n"))
        ((import ,library-name) (lname)
         (preop)
         (f "call void() @pscm_entry_~a()\n" (mangle-library (lname 'raw))))
@@ -266,13 +274,7 @@
           ((unspecified)
            (ret-unspec))))
        ((builtin ,symbol ,@identifier) (sym args)
-        (define fun (assoc-ref (sym 'raw) builtins))
-        (if fun
-            (begin
-              (f "    ; begin builtin ~a\n" (sym 'raw))
-              (apply fun (strip-spans (args)))
-              (f "    ; end builtin ~a\n" (sym 'raw)))
-            (error "no builtin" (sym 'raw))))
+        (apply emit-builtin (sym 'raw) (strip-spans (args))))
        ((return ,identifier) (ident)
         (preop)
         (f "ret i64 ~a\n" (strip-spans (ident))))
@@ -327,6 +329,14 @@
          (set! builtins
                (cons (cons 'name (lambda args body ...))
                      builtins)))))
+    (define (emit-builtin sym . args)
+      (define fun (assoc-ref sym builtins))
+      (if fun
+          (begin
+            (f "    ; begin builtin ~a\n" sym)
+            (apply fun args)
+            (f "    ; end builtin ~a\n" sym))
+          (error "no builtin" sym)))
 
     (define (icmp type a b)
       (define u (unique))
@@ -497,6 +507,10 @@
         (lambda (port)
           (parameterize ((ll-port port)
                          (current-unique 0))
+            (f "%va_list = type { i32, i32, i8*, i8* }\n")
+            (f "declare i64 @pscheme_internal_rest(%va_list*,i64)\n")
+            (f "declare void @llvm.va_start(%va_list*)\n")
+            (f "declare void @llvm.va_end(%va_list*)\n")
             (f "declare i64 @memmove(i64, i64, i64)\n")
             (f "declare i64* @pscheme_allocate_cell()\n")
             (f "declare i64* @pscheme_allocate_block(i64)\n\n")
