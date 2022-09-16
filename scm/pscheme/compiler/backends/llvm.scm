@@ -294,7 +294,7 @@
         (f "    store i64 ~a, i64* %closure_~a_fn\n" fun u)
         (for-each
          (lambda (param n)
-           (f "    %closure_~a_~a = getelementptr i64, i64* %closure_~a, i64 0\n" u n u)
+           (f "    %closure_~a_~a = getelementptr i64, i64* %closure_~a, i64 ~a\n" u n u (+ n 1))
            (f "    store i64 ~a, i64* %closure_~a_~a\n" param u n))
          args
          (iota (length args)))
