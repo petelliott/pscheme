@@ -2,6 +2,7 @@
   (import (scheme base)
           (scheme file)
           (scheme write)
+          (scheme cxr)
           (srfi 28)
           (srfi 1)
           (pscheme base)
@@ -36,7 +37,7 @@
     (define (do-ffi name)
       (ffi (cons name (ffi))))
 
-    (define-pass llvm-declare-extern-pass (ir)
+    (define-pass llvm-declare-extern-pass (ssa-ir)
       (toplevel-def
        ((define ,library-name ,symbol) (lname sym)
         (do-define (list (lname 'raw) (sym 'raw)))))
@@ -173,7 +174,7 @@
     (define (ret-unspec)
       (f "add i64 ~a, 0\n" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON)))
 
-    (define-pass llvm-codegen (ir)
+    (define-pass llvm-codegen (ssa-ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
         (f "%~a_typ = type i64 (i64*, i64~a~a)\n"
@@ -241,7 +242,7 @@
        ((import ,library-name) (lname)
         (preop)
         (f "call void() @pscm_entry_~a()\n" (mangle-library (lname 'raw))))
-       ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction)) (condition tphi tbranch fphi fbranch)
+       ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction) (,@phi)) (condition tphi tbranch fphi fbranch otherphis)
         (define u (unique))
         (define tlabel #f)
         (define flabel #f)
@@ -262,6 +263,10 @@
         (f "    br label %ifend_~a\n" u)
         (last-label (format "ifend_~a" u))
         (f "ifend_~a:\n" u)
+        (for-each (lambda (phi)
+                    (f "    ~a = phi i64 [ ~a, %~a ], [ ~a, %~a ]\n"
+                       (cadr phi) (caddr phi) tlabel (cadddr phi) flabel))
+                  (strip-spans (otherphis)))
         (preop)
         (f "phi i64 [ ~a, %~a ], [ ~a, %~a ]\n"
            (strip-spans (tphi)) tlabel (strip-spans (fphi)) flabel))

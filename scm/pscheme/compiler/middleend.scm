@@ -1,6 +1,7 @@
 (define-library (pscheme compiler middleend)
   (import (scheme base)
           (srfi 1)
+          (pscheme base)
           (pscheme match)
           (pscheme compiler util)
           (pscheme compiler languages)
@@ -169,10 +170,88 @@
            (else (error "invalid argument to irconvert: " program-or-lib))))
         (tl-param)))
 
+
+    (define renames (make-parameter '()))
+    (define (rename-reg from to)
+      (renames (cons (cons from to)
+                     (renames))))
+
+    (define (nameof name names)
+      (or (assoc-ref name names)
+          name))
+
+    (define (cdr-member rest lst)
+      (cond
+       ((eq? rest lst) lst)
+       ((null? lst) #f)
+       (else (cdr-member rest (cdr lst)))))
+
+    (define (common-root a b)
+      (cond
+       ((cdr-member a b) => (lambda (a) a))
+       ((null? a) '())
+       (else (common-root (cdr a) b))))
+
+    (define (since-root l root)
+      (cond
+       ((eq? l root) '())
+       ((null? l) '())
+       (else (cons (car l)
+                   (since-root (cdr l) root)))))
+
+    (define (generate-phis ra rb)
+      (define root (common-root ra rb))
+      (define sra (since-root ra root))
+      (define srb (since-root rb root))
+      (map (lambda (name)
+             (define new-name `(tmp ,(unique)))
+             (rename-reg name new-name)
+             `(phi ,new-name ,(nameof name ra) ,(nameof name rb)))
+           (delete-duplicates (map car (append sra srb)))))
+
+    (define-pass ssa-convert (ir)
+      (program
+       ((,@toplevel-def) (defs)
+        (parameterize ((renames '()))
+          (defs))))
+      (instruction
+       ((void ,op) (op)
+        (if (is-syntax? 'set! (op 'raw))
+            (begin
+              (rename-reg (cadr (op 'raw)) (op))
+              `(void (nop)))
+            `(void ,(op))))
+       ((,identifier ,op) (ident op)
+        (if (is-syntax? 'set! (op 'raw))
+            (begin
+              (rename-reg (cadr (op 'raw)) (op))
+              `(,(ident) (load-special unspecified)))
+            `(,(ident) ,(op)))))
+      (op
+       ((set! ,identifier ,identifier) (lval rval)
+        (rval))
+       ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction)) (con tphi tbranch fphi fbranch)
+        (define-values (tb tr)
+          (parameterize ((renames (renames)))
+            (values (tbranch) (renames))))
+        (define-values (fb fr)
+          (parameterize ((renames (renames)))
+            (values (fbranch) (renames))))
+        (define rn (generate-phis tr fr))
+        `(if ,(con) ,(tphi) ,tb ,(fphi) ,fb ,rn)))
+      (identifier
+       ((local ,number) (n)
+        (nameof `(local ,(n 'raw)) (renames)))
+       ((arg rest) ()
+        (nameof `(arg rest) (renames)))
+       ((arg rest) (n)
+        (nameof `(arg ,(n 'raw)) (renames)))))
+
     (define (middleend prog program-or-lib)
       (define inner
         (concat-passes
-         (lambda (p) (irconvert p program-or-lib))))
+         (lambda (p) (irconvert p program-or-lib))
+         ssa-convert))
       (parameterize ((current-unique 0))
         (inner prog)))
 

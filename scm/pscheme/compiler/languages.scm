@@ -17,7 +17,8 @@
           box?
           unbox
           ref-scheme
-          ir)
+          ir
+          ssa-ir)
   (begin
 
     (define (unquoted-literal? form)
@@ -167,6 +168,7 @@ clo           (vm-sym-span vm)))
         (void ,op)
         (,identifier ,op))
        (op
+        (nop)
         (accumulate-rest ,number)
         (import ,library-name)
         (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction))
@@ -180,5 +182,18 @@ clo           (vm-sym-span vm)))
         (global-ref ,identifier)
         (global-set! ,identifier ,identifier)
         (call ,identifier ,@identifier))))
+
+    (define ssa-ir
+      (edit-language
+       ir
+       (-
+        (op
+         (set! ,identifier ,identifier)
+         (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction))))
+       (+
+        (phi
+         (phi ,identifier ,identifier ,identifier))
+        (op
+         (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction) (,@phi))))))
 
     ))
