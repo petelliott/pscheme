@@ -58,7 +58,7 @@
         (llvm-declare-extern-pass ir)
         (for-each (lambda (name)
                     (f "declare i64 @~a(...)\n" name))
-                  (ffi))
+                  (delete-duplicates (ffi)))
         (f "\n")
         (for-each (lambda (lib)
                     (f "declare void @pscm_entry_~a()\n" (mangle-library lib)))
