@@ -500,9 +500,10 @@
 
     (define (retag n tag)
       (define u (unique))
-      (f "    %retag_~a = lshr i64 ~a, 4\n" u n)
+      (f "    %retag_~a_a = lshr i64 ~a, 4\n" u n)
+      (f "    %retag_~a_b = shl i64 %retag_~a_a, 4\n" u u)
       (preop)
-      (f "or i64 %retag_~a, ~a\n" u tag))
+      (f "or i64 %retag_~a_b, ~a\n" u tag))
 
     (define-builtin (integer->char i) (retag i PSCM-T-CHAR))
     (define-builtin (char->integer i) (retag i PSCM-T-FIXNUM))
