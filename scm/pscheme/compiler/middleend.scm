@@ -4,6 +4,8 @@
           (pscheme base)
           (pscheme match)
           (pscheme compiler util)
+          (pscheme compiler error)
+          (pscheme compiler file)
           (pscheme compiler languages)
           (pscheme compiler nanopass))
   (export middleend)
@@ -36,7 +38,11 @@
          (call-with-toplevel (lambda () body ...)))))
 
     (define (emit form)
-      (lb-param (cons form (lb-param))))
+      (define sform
+        (if (pscheme-error-span)
+            (copy-span (pscheme-error-span) form)
+            form))
+      (lb-param (cons sform (lb-param))))
 
     ;;; conversion from ref-scheme to ir
 
