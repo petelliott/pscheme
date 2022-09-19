@@ -14,7 +14,8 @@
           span-read-all
           normal-read
           unspan1
-          strip-spans)
+          strip-spans
+          first-span)
   (begin
 
     (define-record-type span
@@ -246,5 +247,13 @@
         (cons (strip-spans (car form))
               (strip-spans (cdr form))))
        (else form)))
+
+    (define (first-span form)
+      (cond
+       ((span? form) form)
+       ((pair? form)
+        (or (first-span (car form))
+            (first-span (cdr form))))
+       (else #f)))
 
     ))
