@@ -3,6 +3,7 @@
           (pscheme string)
           (srfi-28))
   (export is-syntax?
+          mangle-sym
           mangle
           mangle-library
           any?
@@ -37,14 +38,17 @@
                          (else (format "$~a$" (number->string (char->integer ch) 16)))))
                       str))
 
+    (define (mangle-sym sym)
+      (sanitize-chars (symbol->string sym)))
+
     (define (mangle-library name)
-      (string-join "$$" (append (map (lambda (sym) (sanitize-chars (symbol->string sym)))
-                                    name))))
+      (string-join "$$" (append (map mangle-sym name))))
+
     (define (mangle lib sym)
       (string-append "pscm_sym_"
                      (mangle-library lib)
                      "$$"
-                     (sanitize-chars (symbol->string sym))))
+                     (mangle-sym sym)))
 
     (define (any? form)
       #t)

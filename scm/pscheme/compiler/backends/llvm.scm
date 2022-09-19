@@ -132,8 +132,8 @@
       (match value
        ((data ,type ,key ,number)
         (format "pscm_~a_~a" key number))
-       ((data ,type ,library-name ,key ,number)
-        (format "pscm_~a_~a_~a" (mangle-library library-name) key number))))
+       ((data ,type ,key ,sym ,number)
+        (format "pscm_~a_~a_~a" key (mangle-sym sym) number))))
 
     (define (data-lltype data)
       (if (string? (car data))
@@ -174,10 +174,11 @@
     (define (ret-unspec)
       (f "add i64 ~a, 0~a\n" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON) (location)))
 
+
     (define-pass llvm-codegen (ssa-ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
-        (define meta (subprogram-metadata (dname 'raw)))
+        (define meta (subprogram-metadata (dbg-lambda-name (dname 'raw))))
         (f "%~a_typ = type i64 (i64*, i64~a~a)\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
@@ -203,13 +204,13 @@
        ((define ,library-name ,symbol) (lib sym)
         (f "@~a = global i64 0\n\n" (mangle (lib 'raw) (sym 'raw))))
        ((entry main ,@instruction) (insts)
-        (define meta (subprogram-metadata '(entry main)))
+        (define meta (subprogram-metadata "main"))
         (f "define i32 @main() !dbg ~a {\n" meta)
         (parameterize ((metascope meta))
           (insts))
         (f "    ret i32 0\n}\n\n"))
        ((entry ,library-name ,@instruction) (lib insts)
-        (define meta (subprogram-metadata `(entry ,(lib 'raw))))
+        (define meta (subprogram-metadata (string-join "::" (map symbol->string (lib 'raw)))))
         (f "define void @pscm_entry_~a() !dbg ~a {\n"
            (mangle-library (lib 'raw))
            meta)
@@ -551,11 +552,14 @@
 
     (define (subprogram-metadata name)
       (register-metadata
-       name (format "distinct !DISubprogram(name: \"~a\", scope: ~a, file: ~a, unit: ~a, type: !DISubroutineType(types: !{null}))"
+       name (format "distinct !DISubprogram(name: \"~a\", scope: ~a, file: ~a, unit: ~a, type: !DISubroutineType(types: !{null}), line: ~a)"
                     name
                     (get-metadata 'file)
                     (get-metadata 'file)
-                    (get-metadata 'compunit))))
+                    (get-metadata 'compunit)
+                    (if (current-span)
+                        (span-sr (current-span))
+                        "0"))))
 
     (define metascope (make-parameter #f))
 
@@ -566,6 +570,13 @@
                   (span-sc (current-span))
                   (metascope))
           ""))
+
+    (define (dbg-lambda-name dname)
+      (match dname
+       ((data ,type ,key ,number)
+        (format "#<~a ~a>" key number))
+       ((data ,type ,key ,sym ,number)
+        (format "~a" sym))))
 
     (define (llvm-compile ir rootname)
       (define llfile (string-append rootname ".ll"))

@@ -79,11 +79,16 @@
          (define (,identifier ,@identifier) ,@proc-toplevel)
          (define-syntax ,identifier ,any))
         (expression
+         (lambda (,@identifier) ,@proc-toplevel)
          (if ,expression ,expression)
          (,expression ,@expression)
          ,literal))
        (+
+        (lambda-name
+         (anon)
+         ,symbol)
         (expression
+         (lambda ,lambda-name (,@identifier) ,@proc-toplevel)
          (call ,expression ,@expression)))))
 
     (define-record-type var-metadata
@@ -112,7 +117,7 @@ clo           (vm-sym-span vm)))
        (-
         (identifier symbol?)
         (expression
-         (lambda (,@identifier) ,@proc-toplevel)
+         (lambda ,lambda-name (,@identifier) ,@proc-toplevel)
          (ffi-symbol ,symbol)))
        (+
         (box box?)
@@ -128,7 +133,7 @@ clo           (vm-sym-span vm)))
          (accumulate-rest ,number))
         (expression
          (ref ,identifier)
-         (lambda (,@box) ,@proc-toplevel)
+         (lambda ,lambda-name (,@box) ,@proc-toplevel)
          (closure ,expression ,@identifier)))))
 
     (define ir
@@ -146,7 +151,7 @@ clo           (vm-sym-span vm)))
         ,number)
        (data-name
         (data ,symbol ,symbol ,number)
-        (data ,symbol ,library-name ,symbol ,number))
+        (data ,symbol ,symbol ,symbol ,number))
        (identifier
         (local ,number)
         (arg rest)

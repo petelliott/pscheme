@@ -77,8 +77,10 @@
          `(quote ,l))
       (proc-toplevel
        ((define (,identifier ,@identifier) ,@proc-toplevel) (name args body)
-        `(define ,(name) (lambda ,(args) ,@(body)))))
+        `(define ,(name) (lambda ,(name) ,(args) ,@(body)))))
       (expression
+       ((lambda (,@identifier) ,@proc-toplevel) (args body)
+        `(lambda (anon) (,@(args)) ,@(body)))
        ((if ,expression ,expression) (test tbranch)
         `(if ,(test) ,(tbranch) (begin)))
        ((,expression ,@expression) (fn args)
@@ -165,13 +167,13 @@
         `(define ,(name) ,(expr))))
 
       (expression
-       ((lambda (,@identifier) ,@proc-toplevel) (args body)
+       ((lambda ,lambda-name (,@identifier) ,@proc-toplevel) (name args body)
         (define arglist (args 'raw))
         (parameterize ((current-frame (new-frame (regular-args arglist '()) (rest-arg arglist) (current-frame))))
           (let* ((processed-body (body))
                  (nlocals (length (frame-locals (current-frame)))))
             `(closure
-              (lambda ,(sloppy-map (lambda (var) (make-box (lookup-var! var))) arglist)
+              (lambda ,(name) ,(sloppy-map (lambda (var) (make-box (lookup-var! var))) arglist)
                 (begin
                   ,@(if (frame-rest-arg (current-frame))
                         `((accumulate-rest ,(length (frame-args (current-frame)))))
@@ -258,9 +260,9 @@
             `(builtin set-cdr! (ref ,(ident)) ,(expr))
             `(set! ,(ident) ,(expr))))
 
-       ((lambda (,@box) ,@proc-toplevel) (args body)
+       ((lambda ,lambda-name (,@box) ,@proc-toplevel) (name args body)
         (define b (body))
-        `(lambda (,@(args))
+        `(lambda ,(name) (,@(args))
            ,(car b) ;; make sure we accumulate the rest arguments before boxing them
            ,@(fold (lambda (arg prev)
                      (if (should-box (unbox arg))

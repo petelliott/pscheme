@@ -125,13 +125,19 @@
               (emit `(void (global-set! ,(ident) ,(expr)))))
             (emit `(void (set! ,(ident) ,(expr)))))))
 
+      (lambda-name
+       ((anon) ()
+        `(data none lambda ,(unique)))
+       (,symbol (sym)
+        `(data none lambda ,(sym) ,(unique))))
+
       (expression
        ((begin ,@expression) (stmts)
         (if (null? (stmts 'raw))
             (emit-tmp-op '(load-special unspecified))
             (last (stmts))))
-       ((lambda (,@box) ,@proc-toplevel) (args body)
-        (define name `(data none lambda ,(unique)))
+       ((lambda ,lambda-name (,@box) ,@proc-toplevel) (lname args body)
+        (define name (lname))
         (with-toplevel
          (emit `(lambda ,name ,(normal-args (args 'raw)) ,(rest-arg (args 'raw))
                         ,@(with-list-block (emit `(void (return ,(last (body)))))))))
