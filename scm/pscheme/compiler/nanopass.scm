@@ -183,7 +183,7 @@
            (if (span? ms)
                (copy-span ms
                           (let ((name (span-form ms)))
-                            (parameterize ((pscheme-error-span  ms))
+                            (parameterize ((current-span  ms))
                               body ...)))
                (let ((name ms))
                  body ...))))))

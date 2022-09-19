@@ -5,8 +5,7 @@
           (scheme process-context)
           (pscheme compiler file)
           (srfi 28))
-  (export pscheme-error-span
-          pscm-err
+  (export pscm-err
           pscm-warn)
   (begin
 
@@ -88,19 +87,17 @@
         (when span
           (print-span span colour))))
 
-    (define pscheme-error-span (make-parameter #f))
-
     (define (pscm-err . args)
       (print-error
        (if (span? (car args))
            (make-pscheme-error #f (car args) (cadr args) (cddr args))
-           (make-pscheme-error #f (pscheme-error-span) (car args) (cdr args))))
+           (make-pscheme-error #f (current-span) (car args) (cdr args))))
       (exit #f))
 
     (define (pscm-warn . args)
       (print-error
        (if (span? (car args))
            (make-pscheme-error #t (car args) (cadr args) (cddr args))
-           (make-pscheme-error #t (pscheme-error-span) (car args) (cdr args)))))
+           (make-pscheme-error #t (current-span) (car args) (cdr args)))))
 
     ))

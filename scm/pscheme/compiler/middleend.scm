@@ -4,7 +4,6 @@
           (pscheme base)
           (pscheme match)
           (pscheme compiler util)
-          (pscheme compiler error)
           (pscheme compiler file)
           (pscheme compiler languages)
           (pscheme compiler nanopass))
@@ -39,8 +38,8 @@
 
     (define (emit form)
       (define sform
-        (if (pscheme-error-span)
-            (copy-span (pscheme-error-span) form)
+        (if (current-span)
+            (copy-span (current-span) form)
             form))
       (lb-param (cons sform (lb-param))))
 

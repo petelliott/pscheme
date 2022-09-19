@@ -11,7 +11,6 @@
           (pscheme compiler util)
           (pscheme compiler languages)
           (pscheme compiler file)
-          (pscheme compiler error)
           (pscheme compiler nanopass)
           (pscheme compiler backend)
           (pscheme compiler library)
@@ -561,10 +560,10 @@
     (define metascope (make-parameter #f))
 
     (define (location)
-      (if (pscheme-error-span)
+      (if (current-span)
           (format ", !dbg !DILocation(line: ~a, column: ~a, scope: ~a)"
-                  (span-sr (pscheme-error-span))
-                  (span-sc (pscheme-error-span))
+                  (span-sr (current-span))
+                  (span-sc (current-span))
                   (metascope))
           ""))
 

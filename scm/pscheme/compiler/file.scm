@@ -15,7 +15,8 @@
           normal-read
           unspan1
           strip-spans
-          first-span)
+          first-span
+          current-span)
   (begin
 
     (define-record-type span
@@ -255,5 +256,7 @@
         (or (first-span (car form))
             (first-span (cdr form))))
        (else #f)))
+
+    (define current-span (make-parameter #f))
 
     ))
