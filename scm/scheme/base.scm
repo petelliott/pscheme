@@ -586,7 +586,8 @@
           (cons (car args) (process-apply-args (cdr args)))))
 
     (define (apply proc . args)
-      (builtin apply proc (process-apply-args args)))
+      (define pargs (process-apply-args args))
+      (builtin ffi-call (ffi-symbol pscheme_internal_apply) proc (builtin fixnum->ffi (length pargs)) pargs))
 
     (define (any-null? list)
       (if (null? list)
