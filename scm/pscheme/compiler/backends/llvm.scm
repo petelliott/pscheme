@@ -9,6 +9,7 @@
           (pscheme string)
           (pscheme match)
           (pscheme compiler util)
+          (pscheme compiler options)
           (pscheme compiler languages)
           (pscheme compiler file)
           (pscheme compiler nanopass)
@@ -554,8 +555,9 @@
                        (span-file span)
                        (span-file span))) ;; TODO: use the actual directory name
         (register-metadata
-         'compunit (format "distinct !DICompileUnit(language: DW_LANG_C99, file: ~a, producer: \"pscheme\", runtimeVersion: 2, emissionKind: FullDebug)"
-                           (get-metadata 'file)))))
+         'compunit (format "distinct !DICompileUnit(language: DW_LANG_C99, file: ~a, producer: \"pscheme\", runtimeVersion: 2, emissionKind: ~a)"
+                           (get-metadata 'file)
+                           (if (option 'debug #f) "FullDebug" "NoDebug")))))
 
     (define (subprogram-metadata name)
       (register-metadata
@@ -609,11 +611,11 @@
             (f "declare i64* @pscheme_allocate_block(i64)\n\n")
             (llvm-declare-extern ir)
             (llvm-codegen ir))))
-      (sys-system (format "clang -g -c ~a -o ~a" llfile objfile))
+      (sys-system (format "llc -filetype=obj ~a -o ~a" llfile objfile))
       objfile)
 
     (define (llvm-link objs outfile)
-      (sys-system (format "clang -g ~a -o ~a"
+      (sys-system (format "clang ~a -o ~a"
                           (string-join " " objs)
                           outfile)))
 
