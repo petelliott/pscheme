@@ -131,10 +131,20 @@
 
     (define (data-name value)
       (match value
-       ((data ,type ,key ,number)
-        (format "pscm_~a_~a" key number))
-       ((data ,type ,key ,sym ,number)
-        (format "pscm_~a_~a_~a" key (mangle-sym sym) number))))
+        ((data ,type ,key ,symnum)
+         (if (symbol? symnum)
+             (format "pscm_~a_~a" key (mangle-sym symnum))
+             (format "pscm_~a_~a" key symnum)))
+        ((data ,type ,key ,sym ,number)
+         (format "pscm_~a_~a_~a" key (mangle-sym sym) number))))
+
+    (define (data-linkage value)
+      (match value
+        ((data ,type ,key ,symnum)
+         (if (symbol? symnum)
+             "linkonce"
+             "private"))
+        (else "private")))
 
     (define (data-lltype data)
       (if (string? (car data))
@@ -163,6 +173,12 @@
                       ((pair) PSCM-T-CONS)
                       (else (error "can't tag data type" (cadr value)))))))
        (else (error "can't represent value" value))))
+
+    (define adefs (make-parameter '()))
+    (define (mark-already-defined obj)
+      (adefs (cons obj (adefs))))
+    (define (already-defined? obj)
+      (member obj (adefs)))
 
     (define current-reg (make-parameter #f))
     (define (preop)
@@ -196,12 +212,14 @@
         (define c (contents 'raw))
         (define n (data-name (name 'raw)))
         (define lltype (data-lltype (contents 'raw)))
-        (f "%~a_typ = ~a\n" n lltype)
-        (f "@~a = private global %~a_typ " n n)
-        (if (string? (car c))
-            (f "c~a" (string->asm (car c)))
-            (f "{~a}" (string-join ", " (map (lambda (d) (format "i64 ~a" (data-repr d))) c))))
-        (f ", align 16\n\n"))
+        (unless (already-defined? n)
+          (mark-already-defined n)
+          (f "%~a_typ = ~a\n" n lltype)
+          (f "@~a = ~a global %~a_typ " n (data-linkage (name 'raw)) n)
+          (if (string? (car c))
+              (f "c~a" (string->asm (car c)))
+              (f "{~a}" (string-join ", " (map (lambda (d) (format "i64 ~a" (data-repr d))) c))))
+          (f ", align 16\n\n")))
        ((define ,library-name ,symbol) (lib sym)
         (f "@~a = global i64 0\n\n" (mangle (lib 'raw) (sym 'raw))))
        ((entry main ,@instruction) (insts)
@@ -584,6 +602,8 @@
       (match dname
        ((data ,type ,key ,number)
         (format "#<~a ~a>" key number))
+       ((data ,type ,key ,sym)
+        (format "~a" sym))
        ((data ,type ,key ,sym ,number)
         (format "~a" sym))))
 
@@ -594,7 +614,8 @@
         (lambda (port)
           (parameterize ((ll-port port)
                          (current-unique 0)
-                         (metadata '()))
+                         (metadata '())
+                         (adefs '()))
             (register-metadata 'dwarf-version "!{i32 7, !\"Dwarf Version\", i32 5}")
             (register-metadata 'debuginfo-version "!{i32 2, !\"Debug Info Version\", i32 3}")
             (f "!llvm.module.flags = !{~a, ~a}\n"

@@ -20,7 +20,7 @@
   (assert (equal? #t #t))
   (assert (not (equal? #t #f))))
 
-(define-test "symbol literal" SKIP
+(define-test "symbol literal"
   (assert (eq? 'hey 'hey))
   (assert (not (eq? 'hey 'ho))))
 

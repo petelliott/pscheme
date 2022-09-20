@@ -82,7 +82,7 @@
           (with-toplevel (emit `(data ,name ,value)))
           name))
        ((symbol? value)
-        (let ((name `(data symbol symbol ,(unique))))
+        (let ((name `(data symbol symbol ,value)))
           (with-toplevel (emit `(data ,name ,(symbol->string value))))
           name))
        ((pair? value)

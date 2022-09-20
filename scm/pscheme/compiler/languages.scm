@@ -151,6 +151,7 @@ clo           (vm-sym-span vm)))
         ,number)
        (data-name
         (data ,symbol ,symbol ,number)
+        (data ,symbol ,symbol ,symbol)
         (data ,symbol ,symbol ,symbol ,number))
        (identifier
         (local ,number)
