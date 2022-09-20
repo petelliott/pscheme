@@ -58,7 +58,6 @@
        (else
         arg)))
 
-
     (define (normal-args args)
       (if (pair? args)
           (cons (rm-vm (unbox (car args)))
@@ -106,6 +105,12 @@
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
         (emit `(entry ,(name) ,@(with-list-block (decls)))))
+       ((import ,@library-name) (names)
+        (for-each (lambda (name)
+                    (emit `(void (import ,name))))
+                  (names 'raw))))
+
+      (library-declaration
        ((import ,@library-name) (names)
         (for-each (lambda (name)
                     (emit `(void (import ,name))))
