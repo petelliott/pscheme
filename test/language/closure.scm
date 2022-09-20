@@ -27,6 +27,13 @@
 
   (assert (equal? (add-list '(1 2 3 4 5)) '(2 3 4 5 6))))
 
+(define-test "nested closure"
+  (define (c1 a)
+    ((lambda ()
+       ((lambda () a)))))
+
+  (assert (eq? 87 (c1 87))))
+
 (define-test "mutable closures"
   (define (ctr)
     (define cnt 0)

@@ -91,6 +91,16 @@
           name))
        (else value)))
 
+    (define (ident->reg ident)
+      (define nident (strip-spans ident))
+      (cond
+       ((is-syntax? 'closure nident)
+        (emit-tmp-op `(closure-ref ,ident)))
+       ((is-syntax? 'global nident)
+        (emit-tmp-op `(global-ref ,ident)))
+       (else
+        ident)))
+
     (define-pass irconvert1 (ref-scheme)
       (identifier
        ((local ,number ,var-metadata) (n v)
@@ -163,15 +173,9 @@
        ((builtin ,symbol ,@expression) (sym args)
         (emit-tmp-op `(builtin ,(sym) ,@(args))))
        ((ref ,identifier) (ident)
-        (cond
-         ((is-syntax? 'closure (ident 'raw))
-          (emit-tmp-op `(closure-ref ,(ident))))
-         ((is-syntax? 'global (ident 'raw))
-          (emit-tmp-op `(global-ref ,(ident))))
-         (else
-          (ident))))
+        (ident->reg (ident)))
        ((closure ,expression ,@identifier) (expr idents)
-        (emit-tmp-op `(closure ,(expr) ,@(idents))))
+        (emit-tmp-op `(closure ,(expr) ,@(map ident->reg (idents)))))
        ((call ,expression ,@expression) (fn args)
         (emit-tmp-op `(call ,(fn) ,@(args))))))
 
