@@ -27,7 +27,9 @@
 (define-test "if"
   (assert (equal? (if #t 5 6) 5))
   (assert (equal? (if #t 5) 5))
-  (assert (equal? (if #f 5 6) 6)))
+  (assert (equal? (if #f 5 6) 6))
+  (assert (equal? (if '() 5 6) 5))
+  (assert (equal? (if 7 5 6) 5)))
 
 (define global-set 1)
 (define-test "assignment"

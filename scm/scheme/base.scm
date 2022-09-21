@@ -204,8 +204,7 @@
           (and (number? a) (number? b) (= a b))))
 
     (define (equal? a b)
-      (or (eq? a b)
-          (and (both number? a b) (= a b))
+      (or (eqv? a b)
           (and (both pair? a b)
                (and (equal? (car a) (car b))
                     (equal? (cdr a) (cdr b))))
@@ -355,9 +354,10 @@
                (list? (cdr obj)))))
 
     (define (make-list n . fill)
+      (define rfill (and (pair? fill) (car fill)))
       (if (eq? n 0)
           '()
-          (cons fill (make-list (- n 1) fill))))
+          (cons rfill (make-list (- n 1) rfill))))
 
     (define (list . rest)
       rest)
@@ -388,12 +388,12 @@
     (define (list-ref l k)
       (if (zero? k)
           (car l)
-          (list-tail (cdr l) (- k 1))))
+          (list-ref (cdr l) (- k 1))))
 
     (define (list-set! l k o)
       (if (zero? k)
           (set-car! l o)
-          (list-tail (cdr l) (- k 1))))
+          (list-set! (cdr l) (- k 1) o)))
 
     (define (memk obj lst key)
       (cond

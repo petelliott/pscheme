@@ -20,6 +20,14 @@
   (assert (equal? (alts b) 2))
   (assert (equal? (alts 3) 3)))
 
+(define-syntax nest
+  (syntax-rules ()
+    ((nest a b) a)))
+
+(define-test "nested"
+  (assert (equal? (fake-quote (alts a)) '((alts a))))
+  (assert (equal? (nest (nest 1 2) (nest 3 4)) 1)))
+
 (define-syntax hyg
   (syntax-rules ()
     ((_ name)
