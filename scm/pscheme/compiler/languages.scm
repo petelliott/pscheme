@@ -42,11 +42,13 @@
         (define-library ,library-name ,@library-declaration)
         (import ,@library-name)
         ,proc-toplevel)
+       (syntax-transformer
+        (syntax-rules (,@symbol) ,@any))
        (proc-toplevel
         (begin ,@proc-toplevel)
         (define ,identifier ,expression)
         (define (,identifier ,@identifier) ,@proc-toplevel)
-        (define-syntax ,identifier ,any)
+        (define-syntax ,identifier ,syntax-transformer)
         ,expression)
        (library-name
         (,@library-name-part))
@@ -77,7 +79,7 @@
         (literal unquoted-literal?)
         (proc-toplevel
          (define (,identifier ,@identifier) ,@proc-toplevel)
-         (define-syntax ,identifier ,any))
+         (define-syntax ,identifier ,syntax-transformer))
         (expression
          (lambda (,@identifier) ,@proc-toplevel)
          (if ,expression ,expression)

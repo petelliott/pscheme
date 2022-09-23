@@ -3,7 +3,8 @@
           (scheme cxr)
           (pscheme compiler file)
           (srfi 1))
-  (export apply-syntax-rules)
+  (export make-syntax-rules
+          transform-syntax)
   (begin
 
 (define (merge-matches . matches)
@@ -124,22 +125,34 @@
           (apply-syntax-pattern matches (cdr form) nth-rep)))
    (else form)))
 
-;(define (map-matches matches f)
-;  (map (lambda (m) (cons (car m) (cons (cadr m) (f (cddr m)))))
-;       matches))
+(define-record-type syntax-rules
+  (make-syntax-rules literals rules env)
+  syntax-rules?
+  (literals syntax-rules-literals)
+  (rules syntax-rules-rules)
+  (env syntax-rules-env))
+
+(define (rule-pattern rule)
+  (car rule))
+
+(define (rule-transform rule)
+  (cadr rule))
 
 ;; takes the cdr of a syntax-rules
-(define (apply-syntax-rules rules form)
-  (define literals (car rules))
-  (define rulepairs (cdr rules))
+(define (transform-syntax-rules transformer args)
   (define (apply-inner rules)
-    (define pattern (cdaar rules))
-    (define target (cadar rules))
-    (define matches (match-syntax-pattern pattern (cdr form) literals))
+    (define pattern (cdr (rule-pattern (car rules))))
+    (define target (rule-transform (car rules)))
+    (define matches (match-syntax-pattern pattern args (syntax-rules-literals transformer)))
     (cond
      (matches (apply-syntax-pattern matches target #f))
      ((null? (cdr rules)) (error "no match for syntax-rule"))
      (else (apply-inner (cdr rules)))))
-  (apply-inner rulepairs))
+  (apply-inner (syntax-rules-rules transformer)))
+
+(define (transform-syntax transformer args)
+  (cond
+   ((syntax-rules? transformer) (transform-syntax-rules transformer args))
+   (else (error "not a valid syntax transformer spec" transformer))))
 
 ))

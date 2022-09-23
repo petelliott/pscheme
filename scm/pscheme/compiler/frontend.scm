@@ -22,9 +22,6 @@
                   (compile-and-import (strip-spans lib)))
                 libs))
 
-    (define (macroexpand1 name args)
-      (apply-syntax-rules (lookup-syntax name) (cons name args)))
-
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
@@ -45,17 +42,22 @@
         (do-import (names 'span))
         `(import ,@(names))))
 
+      (syntax-transformer
+       ((syntax-rules (,@symbol) ,@any) (literals rules)
+        (make-syntax-rules (literals 'raw) (rules 'raw) (current-library))))
+
       (proc-toplevel
-       ((define-syntax ,identifier ,any) (ident syntax)
-        (add-library-syntax! (current-library) (ident 'raw) (cdr (syntax 'raw)))
+       ((define-syntax ,identifier ,syntax-transformer) (ident transformer)
+        (add-library-syntax! (current-library) (ident 'raw) (strip-spans (transformer)))
         '(begin)))
 
       (expression
        ((,expression ,@expression) (name args)
-        (define n (name 'raw))
-        (if (lookup-syntax n)
-            (import-and-macroexpand (macroexpand1 n (args 'span)))
-            `(,(name) ,@(args))))))
+        (cond
+         ((lookup-syntax (name 'raw)) =>
+          (lambda (transformer)
+            (import-and-macroexpand (transform-syntax transformer (args 'span)))))
+         (else `(,(name) ,@(args)))))))
 
     (define-pass track-defines (lscheme)
       (program-toplevel
