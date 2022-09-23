@@ -143,7 +143,7 @@
     (define (parse-terminal term form)
       (if ((cadr term) form)
           (make-t-node (car term) (cadr term) form)
-          (pscm-err "parsing terminal: expected ~a, got ~a" (car term) (strip-spans form))))
+          (pscm-err "parsing terminal: expected ~a, got ~a" (car term) (unspan1 form))))
 
     (define-syntax merge-results
       (syntax-rules ()
@@ -182,7 +182,7 @@
          (let ((ms maybe-span))
            (if (span? ms)
                (copy-span ms
-                          (let ((name (span-form ms)))
+                          (let ((name (unspan1 ms)))
                             (parameterize ((current-span  ms))
                               body ...)))
                (let ((name ms))

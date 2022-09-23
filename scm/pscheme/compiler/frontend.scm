@@ -22,8 +22,8 @@
                   (compile-and-import (strip-spans lib)))
                 libs))
 
-    (define (macroexpand1 form)
-      (apply-syntax-rules (lookup-syntax (car form)) form))
+    (define (macroexpand1 name args)
+      (apply-syntax-rules (lookup-syntax name) (cons name args)))
 
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
@@ -54,7 +54,7 @@
        ((,expression ,@expression) (name args)
         (define n (name 'raw))
         (if (lookup-syntax n)
-            (import-and-macroexpand (macroexpand1 (cons n (args 'raw))))
+            (import-and-macroexpand (macroexpand1 n (args 'span)))
             `(,(name) ,@(args))))))
 
     (define-pass track-defines (lscheme)

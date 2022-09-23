@@ -237,7 +237,7 @@
 
     (define (unspan1 form)
       (if (span? form)
-          (span-form form)
+          (unspan1 (span-form form))
           form))
 
     (define (strip-spans form)

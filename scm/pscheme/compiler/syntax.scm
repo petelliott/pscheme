@@ -1,6 +1,7 @@
 (define-library (pscheme compiler syntax)
   (import (scheme base)
           (scheme cxr)
+          (pscheme compiler file)
           (srfi 1))
   (export apply-syntax-rules)
   (begin
@@ -27,13 +28,14 @@
 
 ;;; matches syntax transformer patterns with ellipsis and whatnot
 (define (match-syntax-pattern pattern form literals)
-  (define (inner pattern form in-ellipsis)
+  (define (inner pattern sform in-ellipsis)
+    (define form (unspan1 sform))
     (cond
      ((and (null? pattern) (null? form)) '())
      ((and (is-ellipsis? pattern) (null? form)) '())
      ((member pattern literals)
       (if (eq? pattern form) '() #f))
-     ((symbol? pattern) (list (cons pattern (make-match in-ellipsis form))))
+     ((symbol? pattern) (list (cons pattern (make-match in-ellipsis sform))))
      ((and (pair? pattern) (not (pair? form))) #f)
      ((pair? pattern)
       (merge-matches (inner (car pattern) (car form)
