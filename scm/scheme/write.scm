@@ -54,6 +54,7 @@
         (write-char #\)))
        ((char? form) (char-write form display))
        ((string? form) (string-write form display))
+       ((symbol? form) (write-string (symbol->string form)))
        ((null? form) (write-string "()"))
        ((eq? form '#f) (write-string "#f"))
        ((eq? form '#t) (write-string "#t"))
