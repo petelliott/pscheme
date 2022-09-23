@@ -546,7 +546,9 @@
       (f "or i64 %retag_~a_b, ~a~a\n" u tag (location)))
 
     (define-builtin (integer->char i) (retag i PSCM-T-CHAR))
-    (define-builtin (char->integer i) (retag i PSCM-T-FIXNUM))
+    (define-builtin (char->integer c) (retag c PSCM-T-FIXNUM))
+    (define-builtin (symbol->string s) (retag s PSCM-T-STRING))
+    (define-builtin (string->symbol s) (retag s PSCM-T-SYMBOL))
 
     ;; debug info
     (define metadata (make-parameter '()))

@@ -221,6 +221,22 @@
   (assert (not (eq? a b)))
   (assert (equal? a b)))
 
+;; 6.5: Symbols
+
+(define-test "symbol?"
+  (assert (symbol? 'hello))
+  (assert (not (symbol? "hello")))
+  (assert (not (symbol? 5))))
+
+(define-test "symbol->string"
+  (assert (string? (symbol->string 'hello)))
+  (assert (equal? (symbol->string 'hello) "hello")))
+
+(define-test "string->symbol" SKIP
+  (assert (symbol? (string->symbol "hello")))
+  (assert (eq? (string->symbol "hello") 'hello)))
+
+
 ;;; 7.3: Derived expression types
 
 (define-test "cond"

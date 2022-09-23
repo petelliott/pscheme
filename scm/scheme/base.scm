@@ -16,6 +16,7 @@
    make-list list length append reverse list-tail list-ref list-set! memq memv
    member assq assv assoc
    ;; 6.5: Symbols
+   symbol? symbol->string string->symbol
    ;; 6.6: Characters
    char? char=? char<? char>? char<=? char>=? char->integer integer->char
    ;; 6.7: Strings
@@ -428,6 +429,18 @@
       (if (null? key)
           (assk obj lst equal?)
           (assk obj lst (car key))))
+
+    ;; 6.5: Symbols
+
+    (define (symbol? obj)
+      (builtin symbol? obj))
+
+    (define (symbol->string obj)
+      (builtin symbol->string obj))
+
+    ;; TODO: intern symbols
+    (define (string->symbol obj)
+      (builtin string->symbol obj))
 
     ;; 6.6: Characters
 
