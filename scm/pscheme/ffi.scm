@@ -1,7 +1,5 @@
 (define-library (pscheme ffi)
-  (export type->ffi ; exported due to an unhygenic macro system
-          ffi->type
-          ff->scheme)
+  (export ff->scheme)
   (begin
 
     ;; TODO: type checks
@@ -21,7 +19,6 @@
         ((_ char arg) (builtin ffi->fixnum arg))
         ((_ void arg) (begin arg (begin)))
         ((_ bool arg) (if (eq? arg 0) #f #t))))
-
 
     (define-syntax ff->scheme
       (syntax-rules ()

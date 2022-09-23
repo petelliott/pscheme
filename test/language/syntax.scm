@@ -35,7 +35,7 @@
             (a 7))
        name))))
 
-(define-test "hygene" SKIP
+(define-test "hygene"
   (assert (equal? (hyg a) 5)))
 
 (finish-tests)

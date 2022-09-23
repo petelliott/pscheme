@@ -78,17 +78,17 @@
           (find (lambda (lib) (member name (library-exports lib)))
                 (library-imports curr-lib))))
 
-    (define (lookup-syntax name)
-      (define library (or (find-library name (current-library))
-                          (current-library)))
+    (define (lookup-syntax name lib)
+      (define library (or (find-library name lib)
+                          lib))
       (define entry (assoc name (library-syntax library)))
       (if entry
           (cdr entry)
           #f))
 
-    (define (lookup-global name)
+    (define (lookup-global name l)
       ;; TODO: we should resolve local shadowing before exported globals
-      (define lib (find-library name (current-library)))
+      (define lib (find-library name l))
       (and lib
            `(global ,(library-name lib) ,name)))
 

@@ -2,8 +2,10 @@
   (import (scheme base)
           (pscheme compiler util)
           (pscheme compiler file)
+          (pscheme compiler syntax)
           (pscheme compiler nanopass))
   (export lscheme
+          scheme-post-macroexpand
           normal-scheme
           make-var-metadata
           var-metadata?
@@ -28,11 +30,15 @@
           (boolean? form)
           (char? form)))
 
+    (define (syntax-or-symbol? form)
+      (or (symbol? form)
+          (syntax-node? form)))
+
     (define lscheme
       (language
        ;; terminals
-       (symbol symbol?)
-       (identifier symbol?)
+       (symbol syntax-or-symbol?)
+       (identifier syntax-or-symbol?)
        (number number?)
        (literal unquoted-literal?)
        (any any?)
@@ -72,14 +78,23 @@
         ,identifier
         ,literal)))
 
-    (define normal-scheme
+    (define scheme-post-macroexpand
       (edit-language
        lscheme
        (-
+        (symbol syntax-or-symbol?)
+        (proc-toplevel
+         (define-syntax ,identifier ,syntax-transformer)))
+       (+
+        (symbol symbol?))))
+
+    (define normal-scheme
+      (edit-language
+       scheme-post-macroexpand
+       (-
         (literal unquoted-literal?)
         (proc-toplevel
-         (define (,identifier ,@identifier) ,@proc-toplevel)
-         (define-syntax ,identifier ,syntax-transformer))
+         (define (,identifier ,@identifier) ,@proc-toplevel))
         (expression
          (lambda (,@identifier) ,@proc-toplevel)
          (if ,expression ,expression)
@@ -117,7 +132,7 @@ clo           (vm-sym-span vm)))
       (edit-language
        normal-scheme
        (-
-        (identifier symbol?)
+        (identifier syntax-or-symbol?)
         (expression
          (lambda ,lambda-name (,@identifier) ,@proc-toplevel)
          (ffi-symbol ,symbol)))

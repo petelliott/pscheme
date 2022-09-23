@@ -2,8 +2,13 @@
   (import (scheme base)
           (scheme cxr)
           (pscheme compiler file)
+          (pscheme compiler util)
           (srfi 1))
   (export make-syntax-rules
+          syntax-node?
+          syntax-node-sym
+          syntax-node-env
+          syntax-node-instance
           transform-syntax)
   (begin
 
@@ -68,7 +73,7 @@
        (else
         (cdar matches))))
 
-                                        ; gets the nth-match if nth-rep is truthy
+    ;; gets the nth-match if nth-rep is truthy
     (define (general-match name matches nth-rep)
       (if nth-rep
           (nth-match name matches nth-rep)
@@ -105,24 +110,37 @@
          "different lengths of ellipsis match in same expansion"))
        (else #f)))
 
-    (define (apply-ellipsis-pattern matches form)
+    (define-record-type syntax-node
+      (make-syntax-node sym env instance)
+      syntax-node?
+      (sym syntax-node-sym)
+      (env syntax-node-env)
+      (instance syntax-node-instance))
+
+    (define (apply-ellipsis-pattern matches form env instance)
       (map
-       (lambda (n) (apply-syntax-pattern matches form n))
+       (lambda (n) (apply-syntax-pattern matches form n env instance))
        (iota (or (pattern-reps form matches) 0))))
 
-    (define (apply-syntax-pattern matches form nth-rep)
+    (define (apply-syntax-pattern matches form nth-rep env instance)
       (cond
        ((null? form) '())
        ((symbol? form)
         (cond
          ((general-match form matches nth-rep) => match-form)
-         (else form)))
+         ;; TODO: this is kind of a hack
+         ((member form '(begin define-library import export define
+                               define-syntax syntax-rules lambda if set!
+                               quote builtin ffi-symbol))
+          form)
+         (else
+          (make-syntax-node form env instance))))
        ((is-ellipsis? form)
-        (append (apply-ellipsis-pattern matches (car form))
-                (apply-syntax-pattern matches (cddr form) nth-rep)))
+        (append (apply-ellipsis-pattern matches (car form) env instance)
+                (apply-syntax-pattern matches (cddr form) nth-rep env instance)))
        ((pair? form)
-        (cons (apply-syntax-pattern matches (car form) nth-rep)
-              (apply-syntax-pattern matches (cdr form) nth-rep)))
+        (cons (apply-syntax-pattern matches (car form) nth-rep env instance)
+              (apply-syntax-pattern matches (cdr form) nth-rep env instance)))
        (else form)))
 
     (define-record-type syntax-rules
@@ -145,7 +163,7 @@
         (define target (rule-transform (car rules)))
         (define matches (match-syntax-pattern pattern args (syntax-rules-literals transformer)))
         (cond
-         (matches (apply-syntax-pattern matches target #f))
+         (matches (apply-syntax-pattern matches target #f (syntax-rules-env transformer) (unique)))
          ((null? (cdr rules)) (error "no match for syntax-rule"))
          (else (apply-inner (cdr rules)))))
       (apply-inner (syntax-rules-rules transformer)))

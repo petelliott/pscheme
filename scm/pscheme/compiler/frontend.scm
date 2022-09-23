@@ -22,44 +22,64 @@
                   (compile-and-import (strip-spans lib)))
                 libs))
 
+    (define (strip-syntax-nodes form)
+      (cond
+       ((syntax-node? form) (syntax-node-sym form))
+       ((span? form) (copy-span form (strip-syntax-nodes (span-form form))))
+       ((pair? form)
+        (cons (strip-syntax-nodes (car form))
+              (strip-syntax-nodes (cdr form))))
+       (else form)))
+
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
-        (define lib (new-library (name 'raw) () ()))
+        (define lib (new-library (strip-syntax-nodes (name 'raw)) () ()))
         (parameterize ((current-library lib))
           `(define-library ,(name) ,@(decls))))
        ((import ,@library-name) (names)
-        (do-import (names 'span))
+        (do-import (strip-syntax-nodes (names 'span)))
         `(import ,@(names))))
 
       (library-declaration
        ((export ,@identifier) (names)
         (for-each (lambda (name)
                     (add-library-export! (current-library) name))
-                  (names 'raw))
+                  (strip-syntax-nodes (names 'raw)))
         '(begin))
        ((import ,@library-name) (names)
-        (do-import (names 'span))
+        (do-import (strip-syntax-nodes (names 'span)))
         `(import ,@(names))))
 
       (syntax-transformer
        ((syntax-rules (,@symbol) ,@any) (literals rules)
-        (make-syntax-rules (literals 'raw) (rules 'raw) (current-library))))
+        (make-syntax-rules (strip-syntax-nodes (literals 'raw)) (strip-syntax-nodes (rules 'raw)) (current-library))))
 
       (proc-toplevel
        ((define-syntax ,identifier ,syntax-transformer) (ident transformer)
-        (add-library-syntax! (current-library) (ident 'raw) (strip-spans (transformer)))
+        (add-library-syntax! (current-library) (strip-syntax-nodes (ident 'raw)) (strip-spans (strip-syntax-nodes (transformer))))
         '(begin)))
 
       (expression
        ((,expression ,@expression) (name args)
+        (define n (name 'raw))
         (cond
-         ((lookup-syntax (name 'raw)) =>
-          (lambda (transformer)
-            (import-and-macroexpand (transform-syntax transformer (args 'span)))))
+         ((or (and (syntax-node? n)
+                   (lookup-syntax (syntax-node-sym n) (syntax-node-env n)))
+              (lookup-syntax n (current-library))) =>
+              (lambda (transformer)
+                (import-and-macroexpand (transform-syntax transformer (args 'span)))))
          (else `(,(name) ,@(args)))))))
 
-    (define-pass track-defines (lscheme)
+    (define-pass remove-syntax-nodes (lscheme)
+      ($ symbol (s)
+         (strip-syntax-nodes s))
+
+      (expression
+       ((quote ,any) (val)
+        `(quote ,(strip-syntax-nodes (val 'raw))))))
+
+    (define-pass track-defines (scheme-post-macroexpand)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
         (parameterize ((current-library (lookup-library (name 'raw))))
@@ -121,15 +141,27 @@
           (regular-args (cdr arg-list)
                         (cons (make-var-metadata (car arg-list) #f #f) onto))))
 
+    (define (var-equal? a b)
+      (or (and (syntax-node? a) (syntax-node? b)
+               (equal? (syntax-node-sym a) (syntax-node-sym b))
+               (equal? (syntax-node-env a) (syntax-node-env b))
+               (equal? (syntax-node-instance a) (syntax-node-instance b)))
+          (equal? a b)))
+
+
+
     (define (vm-cmp a b)
-      (equal? (if (var-metadata? a) (vm-sym a) a)
-              (if (var-metadata? b) (vm-sym b) b)))
+      (var-equal? (if (var-metadata? a) (vm-sym a) a)
+                  (if (var-metadata? b) (vm-sym b) b)))
 
     (define (lookup-var-frame! sym frame)
       (cond
        ((null? frame)
-        (or (lookup-global sym)
-            (pscm-err "undefined variable ~a" sym)))
+        (if (syntax-node? sym)
+            (or (lookup-global (syntax-node-sym sym) (syntax-node-env sym))
+                (pscm-err "undefined variable ~a ~a" (syntax-node-sym sym) sym))
+            (or (lookup-global sym (current-library))
+                (pscm-err "undefined variable (real) ~a" sym))))
        ((and (frame-rest-arg frame)
              (eq? sym (vm-sym (frame-rest-arg frame))))
         `(arg rest ,(frame-rest-arg frame)))
@@ -283,6 +315,7 @@
     (define frontend
       (concat-passes
        import-and-macroexpand
+       remove-syntax-nodes
        track-defines
        normalize-forms
        resolve-names
