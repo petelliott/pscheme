@@ -24,8 +24,6 @@
       (syntax-rules ()
         ((_ rettype fn (type var) ...)
          (lambda (var ...)
-           (begin
-             (set! var (type->ffi type var)) ...)
-           (ffi->type rettype (builtin ffi-call (ffi-symbol fn) var ...))))))
+           (ffi->type rettype (builtin ffi-call (ffi-symbol fn) (type->ffi type var) ...))))))
 
     ))

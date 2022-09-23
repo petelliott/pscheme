@@ -508,9 +508,8 @@
                  s1 (cons s2 rest)))
 
     (define (substring string start end)
-      (define length (- end start))
       (define new (make-string length))
-      (builtin strcpy new string length 0 start)
+      (builtin strcpy new string (- end start) 0 start)
       new)
 
     ; TODO: write fold
@@ -525,8 +524,7 @@
       (define off 0)
       (for-each (lambda (string)
                   (define l (string-length string))
-                  (define o off)
-                  (builtin strcpy new string l o 0)
+                  (builtin strcpy new string l off 0)
                   (set! off (+ off l)))
                 strings)
       new)
@@ -587,7 +585,11 @@
 
     (define (apply proc . args)
       (define pargs (process-apply-args args))
-      (builtin ffi-call (ffi-symbol pscheme_internal_apply) proc (builtin fixnum->ffi (length pargs)) pargs))
+      (builtin ffi-call
+               (ffi-symbol pscheme_internal_apply)
+               proc
+               (builtin fixnum->ffi (length pargs))
+               pargs))
 
     (define (any-null? list)
       (if (null? list)
