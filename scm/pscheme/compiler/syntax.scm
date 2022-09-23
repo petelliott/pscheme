@@ -19,6 +19,12 @@
        (pair? (cdr pattern))
        (eq? (cadr pattern) '...)))
 
+(define-record-type match
+  (make-match in-ellipsis form)
+  match?
+  (in-ellipsis match-in-ellipsis)
+  (form match-form))
+
 ;;; matches syntax transformer patterns with ellipsis and whatnot
 (define (match-syntax-pattern pattern form literals)
   (define (inner pattern form in-ellipsis)
@@ -27,7 +33,7 @@
      ((and (is-ellipsis? pattern) (null? form)) '())
      ((member pattern literals)
       (if (eq? pattern form) '() #f))
-     ((symbol? pattern) (list (cons pattern (cons in-ellipsis form))))
+     ((symbol? pattern) (list (cons pattern (make-match in-ellipsis form))))
      ((and (pair? pattern) (not (pair? form))) #f)
      ((pair? pattern)
       (merge-matches (inner (car pattern) (car form)
@@ -42,22 +48,22 @@
   (define match (assoc name matches))
   (cond
    ((not match) #f)
-   ((cadr match)
-    (error "use of ellipsis match in non-elipssis context" name))
+   ((match-in-ellipsis (cdr match))
+    (error "use of ellipsis match in non-ellipsis context" name))
    (else
-    (cons (car match) (cddr match)))))
+    (cdr match))))
 
 (define (nth-match name matches nth-rep)
   (cond
    ((null? matches) #f)
    ((not (eq? (caar matches) name))
     (nth-match name (cdr matches) nth-rep))
-   ((not (cadar matches))
-    (cons (caar matches) (cddar matches)))
+   ((not (match-in-ellipsis (cdar matches)))
+    (cdar matches))
    ((> nth-rep 0)
     (nth-match name (cdr matches) (- nth-rep 1)))
    (else
-    (cons (caar matches) (cddar matches)))))
+    (cdar matches))))
 
 ; gets the nth-match if nth-rep is truthy
 (define (general-match name matches nth-rep)
@@ -85,7 +91,9 @@
 (define (pattern-reps form matches)
   (cond
    ((is-ellipsis? form) #f)
-   ((and (symbol? form) (cadr (or (assoc form matches) '(#f #f))))
+   ((and (symbol? form)
+         (let ((m (assoc form matches)))
+           (and m (match-in-ellipsis (cdr m)))))
     (count-matches form matches))
    ((pair? form)
     (equalize-through-error
@@ -103,8 +111,9 @@
   (cond
    ((null? form) '())
    ((symbol? form)
-    (let ((m (general-match form matches nth-rep)))
-      (if m (cdr m) form)))
+    (cond
+     ((general-match form matches nth-rep) => match-form)
+     (else form)))
    ((is-ellipsis? form)
     (append (apply-ellipsis-pattern matches (car form))
             (apply-syntax-pattern matches (cddr form) nth-rep)))
