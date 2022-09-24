@@ -109,7 +109,8 @@
           PSCM-T-CHAR
           PSCM-T-CLOSURE
           PSCM-T-SYMBOL
-          PSCM-T-FOREIGN)
+          PSCM-T-FOREIGN
+          PSCM-T-RECORD)
 
     (enum singletons
           PSCM-S-NIL
@@ -428,6 +429,7 @@
     (define-builtin (symbol? obj) (tag-typep obj PSCM-T-SYMBOL))
     (define-builtin (char? obj) (tag-typep obj PSCM-T-CHAR))
     (define-builtin (procedure? obj) (tag-typep obj PSCM-T-CLOSURE))
+    (define-builtin (record? obj) (tag-typep obj PSCM-T-RECORD))
 
     (define-builtin (cons a d)
       (define u (unique))
@@ -475,6 +477,13 @@
       (f "or i64 %alloc_~a_int, ~a~a\n" u tag (location)))
 
     (define-builtin (alloc-string len) (builtin-alloc len PSCM-T-STRING))
+
+    (define (builtin-alloc-slots len tag)
+      (define u (unique))
+      (f "    %alloc_slots_rlen_~a = shl i64 ~a, 4~a\n" u len (location))
+      (builtin-alloc (format "%alloc_slots_rlen_~a" u) tag))
+
+    (define-builtin (alloc-record len) (builtin-alloc-slots len PSCM-T-RECORD))
 
     (define-builtin (string-ref str off)
       (define u (unique))

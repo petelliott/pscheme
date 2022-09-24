@@ -3,6 +3,8 @@
   (export
    ;; 7.3: Derived expression types
    cond case and or when unless let let* letrec letrec* quasiquote
+   ;; 5.5. Record-type definitions
+   define-record-type
    ;; 6.1: Equivalence predicates
    eq? eqv? equal?
    ;; 6.2: Numbers
@@ -191,6 +193,43 @@
                (quasiquote rest)))
         ((_ form)
          (quote form))))
+
+    ;;; 5.5. Record-type definitions
+
+    (define (field-off flist key n)
+      (if (eq? (caar flist) key)
+          n
+          (field-off (cdr flist) key (+ n 1))))
+
+    (define-syntax define-record-field
+      (syntax-rules ()
+        ((_ flist (name accessor))
+         (begin
+           (define slot (field-off flist 'name 1))
+           (define (accessor record) (builtin slot-ref record slot))))
+        ((_ flist (name accessor modifier))
+         (begin
+           (define slot (field-off flist 'name 1))
+           (define (accessor record) (builtin slot-ref record slot))
+           (define (modifier record value) (builtin set-slot! record slot value))))))
+
+    (define-syntax define-record-type
+      (syntax-rules ()
+        ((_ name (conname confields ...) predicate fields ...)
+         (begin
+           (define field-list '(fields ...))
+
+           (define (conname confields ...)
+             (define record (builtin alloc-record (length field-list)))
+             (builtin set-slot! record 0 'name)
+             (builtin set-slot! record (field-off field-list 'confields 1) confields) ...
+             record)
+
+           (define (predicate obj)
+             (and (builtin record? obj)
+                  (eq? 'name (builtin slot-ref obj 0))))
+
+           (define-record-field field-list fields) ...))))
 
     ;;; 6.1: Equivalence predicates
 
@@ -430,7 +469,7 @@
           (assk obj lst equal?)
           (assk obj lst (car key))))
 
-    ;; 6.5: Symbols
+    ;;; 6.5: Symbols
 
     (define (symbol? obj)
       (builtin symbol? obj))
@@ -442,7 +481,7 @@
     (define (string->symbol obj)
       (builtin string->symbol obj))
 
-    ;; 6.6: Characters
+    ;;; 6.6: Characters
 
     (define (char? obj)
       (builtin char? obj))
@@ -473,7 +512,7 @@
     (define (integer->char obj)
       (builtin integer->char obj))
 
-    ;; 6.7: Strings
+    ;;; 6.7: Strings
 
     ;; some string.h functions that we use
     (define memset (ff->scheme void memset (char* dst) (char c) (int n)))
@@ -584,9 +623,9 @@
 
     ;; TODO: string-fill!
 
-    ;; 6.8: Vectors
-    ;; 6.9: Byte Vectors
-    ;; 6.10: Control features
+    ;;; 6.8: Vectors
+    ;;; 6.9: Byte Vectors
+    ;;; 6.10: Control features
 
     (define (procedure? obj)
       (builtin procedure? obj))
@@ -642,9 +681,9 @@
           (for-each1 proc list1)
           (for-each-inner proc (cons list1 lists))))
 
-    ;; 6.13: Input and Output
+    ;;; 6.13: Input and Output
 
-    ;; 6.13.3: Output
+    ;;; 6.13.3: Output
 
     (define strprintf (ff->scheme void printf (char* fmt) (char* value)))
     (define chprintf (ff->scheme void printf (char* fmt) (char value)))
