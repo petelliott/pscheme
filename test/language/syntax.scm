@@ -38,4 +38,20 @@
 (define-test "hygene"
   (assert (equal? (hyg a) 5)))
 
+(define-syntax global-hyg
+  (syntax-rules ()
+    ((_ name val)
+     (begin
+       (define a val)
+       (define (name) a)))))
+
+(global-hyg a 1)
+(global-hyg b 2)
+(global-hyg c 3)
+
+(define-test "global hygene"
+  (assert (equal? (a) 1))
+  (assert (equal? (b) 2))
+  (assert (equal? (c) 3)))
+
 (finish-tests)

@@ -9,6 +9,7 @@
           syntax-node-sym
           syntax-node-env
           syntax-node-instance
+          syntax-equal?
           transform-syntax)
   (begin
 
@@ -116,6 +117,13 @@
       (sym syntax-node-sym)
       (env syntax-node-env)
       (instance syntax-node-instance))
+
+    (define (syntax-equal? a b)
+      (or (and (syntax-node? a) (syntax-node? b)
+               (equal? (syntax-node-sym a) (syntax-node-sym b))
+               (equal? (syntax-node-env a) (syntax-node-env b))
+               (equal? (syntax-node-instance a) (syntax-node-instance b)))
+          (equal? a b)))
 
     (define (apply-ellipsis-pattern matches form env instance)
       (map

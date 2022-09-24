@@ -99,7 +99,9 @@
          `(quote ,l))
       (proc-toplevel
        ((define (,identifier ,@identifier) ,@proc-toplevel) (name args body)
-        `(define ,(name) (lambda ,(name) ,(args) ,@(body)))))
+        (if (syntax-node? (name 'raw))
+            `(define ,(name) (lambda (anon) ,(args) ,@(body)))
+            `(define ,(name) (lambda ,(name) ,(args) ,@(body))))))
       (expression
        ((lambda (,@identifier) ,@proc-toplevel) (args body)
         `(lambda (anon) (,@(args)) ,@(body)))
@@ -141,27 +143,17 @@
           (regular-args (cdr arg-list)
                         (cons (make-var-metadata (car arg-list) #f #f) onto))))
 
-    (define (var-equal? a b)
-      (or (and (syntax-node? a) (syntax-node? b)
-               (equal? (syntax-node-sym a) (syntax-node-sym b))
-               (equal? (syntax-node-env a) (syntax-node-env b))
-               (equal? (syntax-node-instance a) (syntax-node-instance b)))
-          (equal? a b)))
-
-
-
     (define (vm-cmp a b)
-      (var-equal? (if (var-metadata? a) (vm-sym a) a)
-                  (if (var-metadata? b) (vm-sym b) b)))
+      (syntax-equal? (if (var-metadata? a) (vm-sym a) a)
+                     (if (var-metadata? b) (vm-sym b) b)))
 
     (define (lookup-var-frame! sym frame)
       (cond
        ((null? frame)
-        (if (syntax-node? sym)
-            (or (lookup-global (syntax-node-sym sym) (syntax-node-env sym))
-                (pscm-err "undefined variable ~a ~a" (syntax-node-sym sym) sym))
-            (or (lookup-global sym (current-library))
-                (pscm-err "undefined variable (real) ~a" sym))))
+        (or (lookup-global sym (current-library))
+            (and (syntax-node? sym)
+                 (lookup-global (syntax-node-sym sym) (syntax-node-env sym)))
+            (pscm-err "undefined variable ~a" (strip-syntax-nodes sym))))
        ((and (frame-rest-arg frame)
              (eq? sym (vm-sym (frame-rest-arg frame))))
         `(arg rest ,(frame-rest-arg frame)))

@@ -3,6 +3,7 @@
           (scheme file)
           (srfi 1)
           (pscheme compiler compile)
+          (pscheme compiler syntax)
           (pscheme string))
   (export library?
           library-name
@@ -74,14 +75,14 @@
       (add-library-import! (current-library) (lookup-library name)))
 
     (define (find-library name curr-lib)
-      (or (and (assoc name (library-defines curr-lib)) curr-lib)
+      (or (and (assoc name (library-defines curr-lib) syntax-equal?) curr-lib)
           (find (lambda (lib) (member name (library-exports lib)))
                 (library-imports curr-lib))))
 
     (define (lookup-syntax name lib)
       (define library (or (find-library name lib)
                           lib))
-      (define entry (assoc name (library-syntax library)))
+      (define entry (assoc name (library-syntax library) syntax-equal?))
       (if entry
           (cdr entry)
           #f))
@@ -90,6 +91,8 @@
       ;; TODO: we should resolve local shadowing before exported globals
       (define lib (find-library name l))
       (and lib
-           `(global ,(library-name lib) ,name)))
+           (if (syntax-node? name)
+               `(global ,(library-name lib) ,(syntax-node-sym name) ,(syntax-node-instance name))
+               `(global ,(library-name lib) ,name))))
 
     ))
