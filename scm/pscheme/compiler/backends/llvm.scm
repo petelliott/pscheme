@@ -487,7 +487,8 @@
 
     (define (builtin-alloc-slots len tag)
       (define u (unique))
-      (f "    %alloc_slots_~a_rlen = shl i64 ~a, 4~a\n" u len (location))
+      ;; times 3 for 8 byte slots
+      (f "    %alloc_slots_~a_rlen = shl i64 ~a, 3~a\n" u len (location))
       (builtin-alloc (format "%alloc_slots_~a_rlen" u) tag))
 
     (define-builtin (alloc-slots len) (builtin-alloc-slots len PSCM-T-SLOTS))
