@@ -3,6 +3,7 @@
           (scheme cxr)
           (pscheme compiler file)
           (pscheme compiler util)
+          (pscheme compiler error)
           (srfi 1))
   (export make-syntax-rules
           syntax-node?
@@ -172,7 +173,7 @@
         (define matches (match-syntax-pattern pattern args (syntax-rules-literals transformer)))
         (cond
          (matches (apply-syntax-pattern matches target #f (syntax-rules-env transformer) (unique)))
-         ((null? (cdr rules)) (error "no match for syntax-rule"))
+         ((null? (cdr rules)) (pscm-err "no match for syntax-rule"))
          (else (apply-inner (cdr rules)))))
       (apply-inner (syntax-rules-rules transformer)))
 
