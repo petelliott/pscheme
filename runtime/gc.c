@@ -235,15 +235,15 @@ static void scan_object(pscheme_t obj) {
             abort();
         }
     } else if ((br = find_block_region(block_region, p)) != NULL) {
-        if (tag(obj) == PSCM_T_CLOSURE) {
-            pscheme_t *closure = p;
+        if (tag(obj) == PSCM_T_CLOSURE || tag(obj) == PSCM_T_SLOTS) {
+            pscheme_t *slots = p;
 
             struct block *block = (void *)(((char *)p) - sizeof(struct block));
             if (block->free) {
                 block->free = false;
 
                 for (size_t i = 1; i < (block->length / sizeof(pscheme_t)); ++i) {
-                    scan_object(closure[i]);
+                    scan_object(slots[i]);
                 }
             }
         } else if (tag(obj) == PSCM_T_STRING || tag(obj) == PSCM_T_SYMBOL) {
@@ -252,8 +252,6 @@ static void scan_object(pscheme_t obj) {
         } else {
             abort();
         }
-    } else {
-        // TODO: scan statically allocated objects (sometimes)
     }
 }
 

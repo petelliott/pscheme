@@ -14,6 +14,7 @@ enum pscheme_tags {
     PSCM_T_CLOSURE,
     PSCM_T_SYMBOL,
     PSCM_T_FOREIGN,
+    PSCM_T_SLOTS,
 };
 
 typedef uintptr_t pscheme_t;
@@ -31,7 +32,8 @@ static inline uintptr_t tag(pscheme_t obj) { return obj & 0xf; }
 
 static inline bool is_ptr_obj(pscheme_t obj) {
     uintptr_t t = tag(obj);
-    return t == PSCM_T_CONS || t == PSCM_T_STRING || t == PSCM_T_CLOSURE || t == PSCM_T_SYMBOL;
+    return t == PSCM_T_CONS || t == PSCM_T_STRING || t == PSCM_T_CLOSURE ||
+        t == PSCM_T_SYMBOL || t == PSCM_T_SLOTS;
 }
 
 struct pscheme_cons_cell {
