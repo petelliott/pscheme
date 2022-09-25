@@ -28,87 +28,85 @@
            (pair? (cdr pattern))
            (eq? (cadr pattern) '...)))
 
+    ;; addresses indicate a position in ellipses
+    ;; so (1 2) would indicate the 3rd match of the 2nd match of a variable
     (define-record-type match
-      (make-match in-ellipsis form)
+      (make-match name address form)
       match?
-      (in-ellipsis match-in-ellipsis)
+      (name match-name)
+      (address match-address)
       (form match-form))
 
     ;;; matches syntax transformer patterns with ellipsis and whatnot
     (define (match-syntax-pattern pattern form literals)
-      (define (inner pattern sform in-ellipsis)
+      (define (inner pattern sform raddr)
         (define form (unspan1 sform))
         (cond
          ((and (null? pattern) (null? form)) '())
          ((and (is-ellipsis? pattern) (null? form)) '())
          ((member pattern literals)
           (if (eq? pattern form) '() #f))
-         ((symbol? pattern) (list (cons pattern (make-match in-ellipsis sform))))
+         ((symbol? pattern)
+          (list (make-match pattern (reverse raddr) sform)))
          ((and (pair? pattern) (not (pair? form))) #f)
+         ((is-ellipsis? pattern)
+          (apply merge-matches
+                 (map (lambda (f n)
+                        (inner (car pattern) f (cons n raddr)))
+                      form
+                      (iota (length form)))))
          ((pair? pattern)
-          (merge-matches (inner (car pattern) (car form)
-                                (or in-ellipsis (is-ellipsis? pattern)))
-                         (inner (if (is-ellipsis? pattern) pattern (cdr pattern))
-                                (cdr form) in-ellipsis)))
+          (merge-matches (inner (car pattern) (car form) raddr)
+                         (inner (cdr pattern) (cdr form) raddr)))
          ((equal? pattern form) '())
          (else #f)))
-      (inner pattern form #f))
+      (inner pattern form '()))
 
-    (define (single-match name matches)
-      (define match (assoc name matches))
+    (define (is-subaddress subaddr fulladdr)
       (cond
-       ((not match) #f)
-       ((match-in-ellipsis (cdr match))
-        (error "use of ellipsis match in non-ellipsis context" name))
+       ((null? subaddr) #t)
+       ((null? fulladdr) #f)
+       ((not (equal? (car subaddr) (car fulladdr))) #f)
        (else
-        (cdr match))))
+        (is-subaddress (cdr subaddr) (cdr fulladdr)))))
 
-    (define (nth-match name matches nth-rep)
+    (define (get-match name address matches)
       (cond
        ((null? matches) #f)
-       ((not (eq? (caar matches) name))
-        (nth-match name (cdr matches) nth-rep))
-       ((not (match-in-ellipsis (cdar matches)))
-        (cdar matches))
-       ((> nth-rep 0)
-        (nth-match name (cdr matches) (- nth-rep 1)))
+       ((and (eq? name (match-name (car matches)))
+             (is-subaddress (match-address (car matches)) address))
+        (car matches))
        (else
-        (cdar matches))))
+        (get-match name address (cdr matches)))))
 
-    ;; gets the nth-match if nth-rep is truthy
-    (define (general-match name matches nth-rep)
-      (if nth-rep
-          (nth-match name matches nth-rep)
-          (single-match name matches)))
+    (define (get-matches name address matches)
+      (cond
+       ((null? matches) '())
+       ((and (eq? name (match-name (car matches)))
+             (is-subaddress address (match-address (car matches))))
+        (cons (car matches)
+              (get-matches name address (cdr matches))))
+       (else
+        (get-matches name address (cdr matches)))))
 
     (define (equalize-through-error a b msg)
       (cond
        ((not (and a b)) (or a b))
        ((equal? a b) a)
-       (else (error msg))))
+       (else (pscm-err msg))))
 
-    (define (reduce f i l)
-      (if (null? l)
-          i
-          (f (car l) (reduce f i (cdr l)))))
-
-    (define (count-matches form matches)
-      (reduce + 0
-              (map
-               (lambda (m) (if (eq? form (car m)) 1 0))
-               matches)))
-
-    (define (pattern-reps form matches)
+    (define (pattern-reps form addr matches)
       (cond
        ((is-ellipsis? form) #f)
-       ((and (symbol? form)
-             (let ((m (assoc form matches)))
-               (and m (match-in-ellipsis (cdr m)))))
-        (count-matches form matches))
+       ((symbol? form)
+        (let ((l (length (get-matches form addr matches))))
+          (if (= l 0)
+              #f
+              l)))
        ((pair? form)
         (equalize-through-error
-         (pattern-reps (car form) matches)
-         (pattern-reps (cdr form) matches)
+         (pattern-reps (car form) addr matches)
+         (pattern-reps (cdr form) addr matches)
          "different lengths of ellipsis match in same expansion"))
        (else #f)))
 
@@ -126,17 +124,17 @@
                (equal? (syntax-node-instance a) (syntax-node-instance b)))
           (equal? a b)))
 
-    (define (apply-ellipsis-pattern matches form env instance)
+    (define (apply-ellipsis-pattern matches form raddr env instance)
       (map
-       (lambda (n) (apply-syntax-pattern matches form n env instance))
-       (iota (or (pattern-reps form matches) 0))))
+       (lambda (n) (apply-syntax-pattern matches form (cons n raddr) env instance))
+       (iota (or (pattern-reps form (reverse raddr) matches) 0))))
 
-    (define (apply-syntax-pattern matches form nth-rep env instance)
+    (define (apply-syntax-pattern matches form raddr env instance)
       (cond
        ((null? form) '())
        ((symbol? form)
         (cond
-         ((general-match form matches nth-rep) => match-form)
+         ((get-match form (reverse raddr) matches) => match-form)
          ;; TODO: this is kind of a hack
          ((member form '(begin define-library import export define
                                define-syntax syntax-rules lambda if set!
@@ -145,11 +143,11 @@
          (else
           (make-syntax-node form env instance))))
        ((is-ellipsis? form)
-        (append (apply-ellipsis-pattern matches (car form) env instance)
-                (apply-syntax-pattern matches (cddr form) nth-rep env instance)))
+        (append (apply-ellipsis-pattern matches (car form) raddr env instance)
+                (apply-syntax-pattern matches (cddr form) raddr env instance)))
        ((pair? form)
-        (cons (apply-syntax-pattern matches (car form) nth-rep env instance)
-              (apply-syntax-pattern matches (cdr form) nth-rep env instance)))
+        (cons (apply-syntax-pattern matches (car form) raddr env instance)
+              (apply-syntax-pattern matches (cdr form) raddr env instance)))
        (else form)))
 
     (define-record-type syntax-rules
@@ -172,7 +170,7 @@
         (define target (rule-transform (car rules)))
         (define matches (match-syntax-pattern pattern args (syntax-rules-literals transformer)))
         (cond
-         (matches (apply-syntax-pattern matches target #f (syntax-rules-env transformer) (unique)))
+         (matches (apply-syntax-pattern matches target '() (syntax-rules-env transformer) (unique)))
          ((null? (cdr rules)) (pscm-err "no match for syntax-rule"))
          (else (apply-inner (cdr rules)))))
       (apply-inner (syntax-rules-rules transformer)))
