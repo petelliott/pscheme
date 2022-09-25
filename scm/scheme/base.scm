@@ -2,7 +2,7 @@
   (import (pscheme ffi))
   (export
    ;; 7.3: Derived expression types
-   cond case and or when unless let let* letrec letrec* quasiquote
+   cond case and or when unless let let* letrec letrec* do quasiquote
    ;; 5.5. Record-type definitions
    define-record-type
    ;; 6.1: Equivalence predicates
@@ -181,6 +181,29 @@
            (set! var1 init1)
            ...
            (let () body1 body2 ...)))))
+
+    (define-syntax do
+      (syntax-rules ()
+        ((do ((var init step ...) ...)
+             (test expr ...)
+           command ...)
+         (letrec
+             ((loop
+               (lambda (var ...)
+                 (if test
+                     (begin
+                       (if #f #f)
+                       expr ...)
+                     (begin
+                       command
+                       ...
+                       (loop (do "step" var step ...)
+                             ...))))))
+           (loop init ...)))
+        ((do "step" x)
+         x)
+        ((do "step" x y)
+         y)))
 
     (define-syntax quasiquote
       (syntax-rules (unquote unquote-splicing)
