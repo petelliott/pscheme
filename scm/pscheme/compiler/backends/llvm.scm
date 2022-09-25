@@ -110,7 +110,7 @@
           PSCM-T-CLOSURE
           PSCM-T-SYMBOL
           PSCM-T-FOREIGN
-          PSCM-T-RECORD)
+          PSCM-T-SLOTS)
 
     (enum singletons
           PSCM-S-NIL
@@ -429,7 +429,7 @@
     (define-builtin (symbol? obj) (tag-typep obj PSCM-T-SYMBOL))
     (define-builtin (char? obj) (tag-typep obj PSCM-T-CHAR))
     (define-builtin (procedure? obj) (tag-typep obj PSCM-T-CLOSURE))
-    (define-builtin (record? obj) (tag-typep obj PSCM-T-RECORD))
+    (define-builtin (slots? obj) (tag-typep obj PSCM-T-SLOTS))
 
     (define-builtin (cons a d)
       (define u (unique))
@@ -451,7 +451,10 @@
       (preop)
       (f "load i64, i64* %slot_~a_ptr~a\n" u (location)))
 
-    (define-builtin (slot-ref obj slot) (builtin-slot-ref obj slot))
+    (define-builtin (slot-ref obj slot)
+      (define u (unique))
+      (f "    %slot_~a_r = lshr i64 ~a, 4~a\n" u slot (location))
+      (builtin-slot-ref obj (format "%slot_~a_r" u)))
     (define-builtin (car pair) (builtin-slot-ref pair 0))
     (define-builtin (cdr pair) (builtin-slot-ref pair 1))
 
@@ -465,13 +468,17 @@
       (preop)
       (ret-unspec))
 
-    (define-builtin (set-slot! obj slot value) (builtin-set-slot! obj slot value))
+    (define-builtin (set-slot! obj slot value)
+      (define u (unique))
+      (f "    %slot_~a_r = lshr i64 ~a, 4~a\n" u slot (location))
+      (builtin-set-slot! obj (format "%slot_~a_r" u) value))
     (define-builtin (set-car! pair value) (builtin-set-slot! pair 0 value))
     (define-builtin (set-cdr! pair value) (builtin-set-slot! pair 1 value))
 
     (define (builtin-alloc len tag)
       (define u (unique))
-      (f "    %alloc_~a_ptr = call i64*(i64) @pscheme_allocate_block(i64 ~a)~a\n" u len (location))
+      (f "    %alloc_~a_len = lshr i64 ~a, 4~a\n" u len (location))
+      (f "    %alloc_~a_ptr = call i64*(i64) @pscheme_allocate_block(i64 %alloc_~a_len)~a\n" u u (location))
       (f "    %alloc_~a_int = ptrtoint i64* %alloc_~a_ptr to i64~a\n" u u (location))
       (preop)
       (f "or i64 %alloc_~a_int, ~a~a\n" u tag (location)))
@@ -480,10 +487,10 @@
 
     (define (builtin-alloc-slots len tag)
       (define u (unique))
-      (f "    %alloc_slots_rlen_~a = shl i64 ~a, 4~a\n" u len (location))
-      (builtin-alloc (format "%alloc_slots_rlen_~a" u) tag))
+      (f "    %alloc_slots_~a_rlen = shl i64 ~a, 4~a\n" u len (location))
+      (builtin-alloc (format "%alloc_slots_~a_rlen" u) tag))
 
-    (define-builtin (alloc-record len) (builtin-alloc-slots len PSCM-T-RECORD))
+    (define-builtin (alloc-slots len) (builtin-alloc-slots len PSCM-T-SLOTS))
 
     (define-builtin (string-ref str off)
       (define u (unique))

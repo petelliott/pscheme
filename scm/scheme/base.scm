@@ -220,13 +220,14 @@
            (define field-list '(fields ...))
 
            (define (conname confields ...)
-             (define record (builtin alloc-record (length field-list)))
+             (define record (builtin alloc-slots (+ (length field-list) 1)))
              (builtin set-slot! record 0 'name)
              (builtin set-slot! record (field-off field-list 'confields 1) confields) ...
              record)
 
            (define (predicate obj)
-             (and (builtin record? obj)
+             ;; this is safe because records are the only user-facing slots object availible
+             (and (builtin slots? obj)
                   (eq? 'name (builtin slot-ref obj 0))))
 
            (define-record-field field-list fields) ...))))
