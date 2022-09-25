@@ -36,6 +36,11 @@ static inline bool is_ptr_obj(pscheme_t obj) {
         t == PSCM_T_SYMBOL || t == PSCM_T_SLOTS;
 }
 
+static inline bool is_leaf_obj(pscheme_t obj) {
+    uintptr_t t = tag(obj);
+    return t == PSCM_T_SYMBOL || t == PSCM_T_STRING;
+}
+
 struct pscheme_cons_cell {
     pscheme_t car;
     pscheme_t cdr;

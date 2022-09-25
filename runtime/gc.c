@@ -172,6 +172,10 @@ static struct block_region *make_block_region(struct block_region *next) {
 static struct block_region *block_region = NULL;
 
 void *pscheme_allocate_block(size_t len) {
+    if (len <= sizeof(struct pscheme_cons_cell)) {
+        return pscheme_allocate_cell();
+    }
+
     void *ptr;
     if (block_region != NULL) {
         ptr = try_allocate_block(block_region, len);
@@ -222,35 +226,28 @@ static void scan_object(pscheme_t obj) {
     struct block_region *br;
 
     if ((cr = find_cell_region(cell_region, p)) != NULL) {
-        if (tag(obj) == PSCM_T_CONS) {
-            struct pscheme_cons_cell *cell = p;
-            if (!get_bit(cr->allocated, cell - cr->cells)) {
-                // mark the cell as allocated.
-                set_bit(cr->allocated, cell - cr->cells, true);
+        struct pscheme_cons_cell *cell = p;
+        if (!get_bit(cr->allocated, cell - cr->cells)) {
+            // mark the cell as allocated.
+            set_bit(cr->allocated, cell - cr->cells, true);
 
+            if (!is_leaf_obj(obj)) {
                 scan_object(cell->car);
                 scan_object(cell->cdr);
             }
-        } else {
-            abort();
         }
     } else if ((br = find_block_region(block_region, p)) != NULL) {
-        if (tag(obj) == PSCM_T_CLOSURE || tag(obj) == PSCM_T_SLOTS) {
-            pscheme_t *slots = p;
+        pscheme_t *slots = p;
 
-            struct block *block = (void *)(((char *)p) - sizeof(struct block));
-            if (block->free) {
-                block->free = false;
+        struct block *block = (void *)(((char *)p) - sizeof(struct block));
+        if (block->free) {
+            block->free = false;
 
+            if (!is_leaf_obj(obj)) {
                 for (size_t i = 1; i < (block->length / sizeof(pscheme_t)); ++i) {
                     scan_object(slots[i]);
                 }
             }
-        } else if (tag(obj) == PSCM_T_STRING || tag(obj) == PSCM_T_SYMBOL) {
-            struct block *block = (void *)(((char *)p) - sizeof(struct block));
-            block->free = false;
-        } else {
-            abort();
         }
     }
 }
