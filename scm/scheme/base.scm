@@ -26,6 +26,9 @@
    string>? string<=? string>=? substring string-append list->string
    string->list string-copy string-copy!
    ;; 6.8: Vectors
+   vector? make-vector vector vector-length vector-ref vector-set! vector->list
+   list->vector vector->string string->vector vector-copy vector-copy!
+   vector-append vector-fill!
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
    procedure? apply map for-each
@@ -267,11 +270,23 @@
       (or (eq? a b)
           (and (number? a) (number? b) (= a b))))
 
+    (define (vector-equal?-inner a b i l)
+      (if (< i l)
+          (and (equal? (vector-ref a i) (vector-ref b i))
+               (vector-equal?-inner a b (+ i 1) l))
+          #t))
+
+    (define (vector-equal? a b)
+      (and (equal? (vector-length a) (vector-length b))
+           (vector-equal?-inner a b 0 (vector-length a))))
+
     (define (equal? a b)
       (or (eqv? a b)
           (and (both pair? a b)
                (and (equal? (car a) (car b))
                     (equal? (cdr a) (cdr b))))
+          (and (both vector? a b)
+               (vector-equal? a b))
           (and (both string? a b) (string=? a b))))
 
     ;;; 6.2: Numbers
@@ -648,6 +663,111 @@
     ;; TODO: string-fill!
 
     ;;; 6.8: Vectors
+
+    (define-record-type vector
+      (construct-vector length data)
+      vector?
+      (length vector-length vector-set-length!)
+      (data vector-data vector-set-data!))
+
+    (define (make-vector k . fill)
+      (define vector (construct-vector k (builtin alloc-slots k)))
+      (unless (null? fill)
+        (vector-fill! vector (car fill)))
+      vector)
+
+    (define (vector . rest)
+      (list->vector rest))
+
+    (define (vector-ref vector k)
+      (builtin slot-ref (vector-data vector) k))
+
+    (define (vector-set! vector k obj)
+      (builtin set-slot! (vector-data vector) k obj))
+
+    (define (vector->list vector . rest)
+      (define start (if (null? rest) 0 (car rest)))
+      (define end (if (or (null? rest) (null? (cdr rest)))
+                      (vector-length vector)
+                      (cadr rest)))
+      (define (inner i)
+        (if (< i end)
+            (cons (vector-ref vector i)
+                  (inner (+ i 1)))
+            '()))
+      (inner start))
+
+    (define (list->vector list)
+      (do ((vector (make-vector (length list)))
+           (l list (cdr l))
+           (i 0 (+ i 1)))
+          ((null? l) vector)
+        (vector-set! vector i (car l))))
+
+    (define (vector->string vector . rest)
+      (define start (if (null? rest) 0 (car rest)))
+      (define end (if (or (null? rest) (null? (cdr rest)))
+                      (vector-length vector)
+                      (cadr rest)))
+
+      (do ((str (make-string (- end start)))
+           (i start (+ i 1)))
+          ((>= i end) str)
+        (string-set! str (- i start) (vector-ref vector i))))
+
+    (define (string->vector string . rest)
+      (define start (if (null? rest) 0 (car rest)))
+      (define end (if (or (null? rest) (null? (cdr rest)))
+                      (string-length string)
+                      (cadr rest)))
+
+      (do ((vector (make-vector (- end start)))
+           (i start (+ i 1)))
+          ((>= i end) vector)
+        (vector-set! vector (- i start) (string-ref string i))))
+
+    (define (vector-copy vector0 . rest)
+      (define start (if (null? rest) 0 (car rest)))
+      (define end (if (or (null? rest) (null? (cdr rest)))
+                      (vector-length vector0)
+                      (cadr rest)))
+
+      (do ((vector1 (make-vector (- end start)))
+           (i start (+ i 1)))
+          ((>= i end) vector1)
+        (vector-set! vector1 (- i start) (vector-ref vector0 i))))
+
+    ;; TODO: memmove semantics
+    (define (vector-copy! to at from . rest)
+      (define start (if (null? rest) 0 (car rest)))
+      (define end (if (or (null? rest) (null? (cdr rest)))
+                      (vector-length from)
+                      (cadr rest)))
+
+      (do ((i start (+ i 1)))
+          ((>= i end) to)
+        (vector-set! to (+ at (- i start)) (vector-ref from i))))
+
+    (define (vector-append . vectors)
+      (define new-len (apply + (map vector-length vectors)))
+      (define new-vec (make-vector new-len))
+      (define off 0)
+      (do ((v vectors (cdr v)))
+          ((null? v))
+        (vector-copy! new-vec off (car v))
+        (set! off (+ off (vector-length (car v)))))
+      new-vec)
+
+    (define (vector-fill! vector fill . rest)
+      (define start (if (null? rest) 0 (car rest)))
+      (define end (if (or (null? rest) (null? (cdr rest)))
+                      (vector-length vector)
+                      (cadr rest)))
+      (do ((i start (+ i 1)))
+          ((>= i end))
+        (vector-set! vector i fill))
+      vector)
+
     ;;; 6.9: Byte Vectors
     ;;; 6.10: Control features
 
