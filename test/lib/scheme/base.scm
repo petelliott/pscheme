@@ -60,13 +60,15 @@
   (assert (equal? '(a (b) c) '(a (b) c)))
   (assert (equal? "abc" "abc"))
   (assert (equal? 2 2))
-  ;; TODO: vectors
+  (assert (equal? (vector) (vector)))
+  (assert (equal? (vector 5 'a) (vector 5 'a)))
   ;; TODO: circular forms
   (assert (not (equal? 'a 'b)))
   (assert (not (equal? '(a) '(b))))
   (assert (not (equal? '(a (b) c) '(a (d) c))))
   (assert (not (equal? "abc" "abcd")))
-  (assert (not (equal? 2 3))))
+  (assert (not (equal? 2 3)))
+  (assert (not (equal? (vector 5 'a) (vector 5 'b)))))
 
 ;;; 6.2: Numbers
 
@@ -236,6 +238,79 @@
   (assert (symbol? (string->symbol "hello")))
   (assert (eq? (string->symbol "hello") 'hello)))
 
+;;; 6.8: Vectors
+
+(define-test "vector?"
+  (assert (vector? (make-vector 0)))
+  (assert (not (vector? '()))))
+
+(define-test "make-vector"
+  (define v (make-vector 5 8))
+  (assert (vector? v))
+  (assert (equal? (vector-length v) 5))
+  (assert (equal? (vector-ref v 4) 8)))
+
+(define-test "vector"
+  (define v (vector 'a 'b 'c))
+  (assert (vector? v))
+  (assert (equal? (vector-length v) 3))
+  (assert (eq? (vector-ref v 0) 'a))
+  (assert (eq? (vector-ref v 1) 'b))
+  (assert (eq? (vector-ref v 2) 'c)))
+
+(define-test "list->vector"
+  (define l '(1 () (1 2 3) a))
+  (assert (vector? (list->vector l)))
+  (assert (list? (vector->list (list->vector l))))
+  (assert (equal? (vector-length (list->vector '())) 0))
+  (assert (equal? (vector-length (list->vector l)) 4))
+  (assert (equal? (vector->list (list->vector l)) l)))
+
+(define-test "vector->list"
+  (define v (vector 1 '() 'a))
+  (define l0 (vector->list v 2 2))
+  (define l1 (vector->list v 1 2))
+  (define l2 (vector->list v 1))
+  (assert (list? l0))
+  (assert (equal? l0 '()))
+  (assert (list? l1))
+  (assert (equal? l1 '(())))
+  (assert (list? l2))
+  (assert (equal? l2 '(() a))))
+
+(define-test "vector->string"
+  (define v (vector #\h #\e #\l #\l #\o))
+  (assert (equal? (vector->string v) "hello"))
+  (assert (equal? (vector->string v 2) "llo"))
+  (assert (equal? (vector->string v 1 4) "ell")))
+
+(define-test "string->vector"
+  (define s "hello")
+  (assert (equal? (string->vector s) (vector #\h #\e #\l #\l #\o)))
+  (assert (equal? (string->vector s 2) (vector #\l #\l #\o)))
+  (assert (equal? (string->vector s 1 4) (vector #\e #\l #\l))))
+
+(define-test "vector-copy"
+  (define v (vector #\h #\e #\l #\l #\o))
+  (assert (equal? (vector-copy v) (vector #\h #\e #\l #\l #\o)))
+  (assert (equal? (vector-copy v 2) (vector #\l #\l #\o)))
+  (assert (equal? (vector-copy v 1 4) (vector #\e #\l #\l))))
+
+(define-test "vector-copy!"
+  (define v1 (vector 1 2 3 4 5))
+  (define v2 (vector 'a 'b 'c 'd 'e))
+  (assert (equal? (vector-copy! v2 1 v1 1 4) (vector 'a 2 3 4 'e)))
+  (assert (equal? v2 (vector 'a 2 3 4 'e)))
+  (assert (equal? (vector-copy! v2 0 v1) (vector 1 2 3 4 5)))
+  (assert (equal? v2 (vector 1 2 3 4 5))))
+
+(define-test "vector-append"
+  (assert (equal? (vector-append (vector) (vector 1 2) (vector 3 4)) (vector 1 2 3 4))))
+
+(define-test "vector-fill!"
+  (define v1 (vector 1 2 3 4 5))
+  (vector-fill! v1 '(1))
+  (assert (equal? v1 (vector '(1) '(1) '(1) '(1) '(1)))))
 
 ;;; 7.3: Derived expression types
 
