@@ -45,29 +45,16 @@
 
     ;;; conversion from ref-scheme to ir
 
-    (define (rm-vm arg)
-      (match arg
-       ((local ,number ,var-metadata)
-        `(local ,number))
-       ((arg rest ,var-metadata)
-        `(arg rest))
-       ((arg ,number ,var-metadata)
-        `(arg ,number))
-       ((closure ,number ,var-metadata)
-        `(closure ,number))
-       (else
-        arg)))
-
     (define (normal-args args)
       (if (pair? args)
-          (cons (rm-vm (unbox (car args)))
+          (cons (unbox (car args))
                 (normal-args (cdr args)))
           '()))
 
     (define (rest-arg args)
       (cond
        ((pair? args) (rest-arg (cdr args)))
-       ((box? args) (rm-vm (unbox args)))
+       ((box? args) (unbox args))
        ((null? args) #f)))
 
     (define (emit-tmp-op op)
@@ -102,16 +89,6 @@
         ident)))
 
     (define-pass irconvert1 (ref-scheme)
-      (identifier
-       ((local ,number ,var-metadata) (n v)
-        `(local ,(n)))
-       ((arg rest ,var-metadata) (v)
-        `(arg rest))
-       ((arg ,number ,var-metadata) (n v)
-        `(arg ,(n)))
-       ((closure ,number ,var-metadata) (n v)
-        `(closure ,(n))))
-
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
         (emit `(entry ,(name) ,@(with-list-block (decls)))))
@@ -260,12 +237,12 @@
         (define rn (generate-phis tr fr))
         `(if ,(con) ,(tphi) ,tb ,(fphi) ,fb ,rn)))
       (identifier
-       ((local ,number) (n)
-        (nameof `(local ,(n 'raw)) (renames)))
-       ((arg rest) ()
-        (nameof `(arg rest) (renames)))
-       ((arg ,number) (n)
-        (nameof `(arg ,(n 'raw)) (renames)))))
+       ((local ,number ,var-metadata) (n v)
+        (nameof `(local ,(n 'raw) ,(v 'raw)) (renames)))
+       ((arg rest ,var-metadata) (v)
+        (nameof `(arg rest ,(v 'raw)) (renames)))
+       ((arg ,number ,var-metadata) (n v)
+        (nameof `(arg ,(n 'raw) ,(v 'raw)) (renames)))))
 
     (define (middleend prog program-or-lib)
       (define inner
