@@ -203,7 +203,7 @@
       (map (lambda (name)
              (define new-name `(tmp ,(unique)))
              (rename-reg name new-name)
-             `(phi ,new-name ,(nameof name ra) ,(nameof name rb)))
+             `(phi ,name ,new-name ,(nameof name ra) ,(nameof name rb)))
            (delete-duplicates (map car (append sra srb)))))
 
     (define-pass ssa-convert (ir)
@@ -211,22 +211,12 @@
        ((,@toplevel-def) (defs)
         (parameterize ((renames '()))
           (defs))))
-      (instruction
-       ((void ,op) (op)
-        (if (is-syntax? 'set! (op 'raw))
-            (begin
-              (rename-reg (cadr (op 'raw)) (op))
-              `(void (nop)))
-            `(void ,(op))))
-       ((,identifier ,op) (ident op)
-        (if (is-syntax? 'set! (op 'raw))
-            (begin
-              (rename-reg (cadr (op 'raw)) (op))
-              `(,(ident) (load-special unspecified)))
-            `(,(ident) ,(op)))))
       (op
        ((set! ,identifier ,identifier) (lval rval)
-        (rval))
+        (define l (lval 'raw))
+        (define r (rval))
+        (rename-reg l r)
+        `(meta-set! ,l ,r))
        ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction)) (con tphi tbranch fphi fbranch)
         (define-values (tb tr)
           (parameterize ((renames (renames)))

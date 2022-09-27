@@ -219,8 +219,9 @@ clo           (vm-sym-span vm)))
          (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction))))
        (+
         (phi
-         (phi ,identifier ,identifier ,identifier))
+         (phi ,identifier ,identifier ,identifier ,identifier))
         (op
+         (meta-set! ,identifier ,identifier)
          (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction) (,@phi))))))
 
     ))

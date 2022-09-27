@@ -284,6 +284,9 @@
        ((import ,library-name) (lname)
         (preop)
         (f "call void() @pscm_entry_~a()~a\n" (mangle-library (lname 'raw)) (location)))
+       ((meta-set! ,identifier ,identifier) (l r)
+        (preop)
+        (ret-unspec))
        ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction) (,@phi)) (condition tphi tbranch fphi fbranch otherphis)
         (define u (unique))
         (define tlabel #f)
@@ -306,8 +309,10 @@
         (last-label (format "ifend_~a" u))
         (f "ifend_~a:\n" u)
         (for-each (lambda (phi)
-                    (f "    ~a = phi i64 [ ~a, %~a ], [ ~a, %~a ]~a\n"
-                       (cadr phi) (caddr phi) tlabel (cadddr phi) flabel (location)))
+                    (match phi
+                      ((phi ,name ,new ,tval ,fval)
+                       (f "    ~a = phi i64 [ ~a, %~a ], [ ~a, %~a ]~a\n"
+                          new tval tlabel fval flabel (location)))))
                   (strip-spans (otherphis)))
         (preop)
         (f "phi i64 [ ~a, %~a ], [ ~a, %~a ]~a\n"
