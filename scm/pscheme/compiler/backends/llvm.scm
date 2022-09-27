@@ -222,9 +222,11 @@
               (f "{~a}" (string-join ", " (map (lambda (d) (format "i64 ~a" (data-repr d))) c))))
           (f ", align 16\n\n")))
        ((define ,library-name ,symbol) (lib sym)
-        (f "@~a = global i64 0\n\n" (mangle (lib 'raw) (sym 'raw))))
+        (f "@~a = global i64 0~a\n\n"
+           (mangle (lib 'raw) (sym 'raw)) (global-var-debug (sym 'raw) #f)))
        ((define ,library-name ,symbol ,number) (lib sym num)
-        (f "@~a$~a = private global i64 0\n\n" (mangle (lib 'raw) (sym 'raw)) (num 'raw)))
+        (f "@~a$~a = private global i64 0~a\n\n"
+           (mangle (lib 'raw) (sym 'raw)) (num 'raw) (global-var-debug (sym 'raw) (num 'raw))))
        ((entry main ,@instruction) (insts)
         (define meta (subprogram-metadata "main"))
         (f "define i32 @main() !dbg ~a {\n" meta)
@@ -591,23 +593,46 @@
       (metadata (cons (cons key n) (metadata)))
       (format "!~a" n))
 
+    (define (reserve-metadata key)
+      (define n (if (null? (metadata))
+                    0
+                    (+ 1 (cdar (metadata)))))
+      (metadata (cons (cons key n) (metadata))))
+
+    (define (set-metadata key md)
+      (define slot (assoc key (metadata)))
+      (f "!~a = ~a\n" (cdr slot) md)
+      (format "!~a" (cdr slot)))
+
     (define (get-metadata key)
       (define n (assoc-ref key (metadata)))
       (if n
           (format "!~a" n)
           #f))
 
+    (define (get-all-metadata key)
+      (define (inner lst)
+        (cond
+         ((null? lst) '())
+         ((equal? key (caar lst))
+          (cons (format "!~a" (cdar lst))
+                (inner (cdr lst))))
+         (else
+          (inner (cdr lst)))))
+      (format "!{~a}" (string-join ", " (inner (metadata)))))
+
     (define (file-metadata ir)
       (define span (first-span ir))
       (when span
-        (register-metadata
+        (set-metadata
          'file (format "!DIFile(filename: \"~a\", directory: \"~a\")"
                        (span-file span)
                        (span-file span))) ;; TODO: use the actual directory name
-        (register-metadata
-         'compunit (format "distinct !DICompileUnit(language: DW_LANG_C99, file: ~a, producer: \"pscheme\", runtimeVersion: 2, emissionKind: ~a)"
+        (set-metadata
+         'compunit (format "distinct !DICompileUnit(language: DW_LANG_C99, file: ~a, producer: \"pscheme\", runtimeVersion: 2, emissionKind: ~a, globals: ~a)"
                            (get-metadata 'file)
-                           (if (option 'debug #f) "FullDebug" "NoDebug")))))
+                           (if (option 'debug #f) "FullDebug" "NoDebug")
+                           (get-all-metadata 'global)))))
 
     (define (subprogram-metadata name)
       (register-metadata
@@ -629,6 +654,17 @@
                   (span-sc (current-span))
                   (metascope))
           ""))
+
+    (define (pscheme-builtin-types)
+      (register-metadata 'pscheme_t "!DIBasicType(name: \"pscheme_t\", size: 64, align: 64, encoding: DW_ATE_unsigned)")
+      (register-metadata 'size_t "!DIBasicType(name: \"size_t\", size: 64, align: 64, encoding: DW_ATE_unsigned)"))
+
+    (define (global-var-debug name number)
+      (define n (if number (format "~a#~a" name number) name))
+      (define gv (register-metadata #f (format "!DIGlobalVariable(name: \"~a\", scope: ~a, file: ~a, type: ~a, isLocal: false, isDefinition: true)"
+                                               n (get-metadata 'file) (get-metadata 'file) (get-metadata 'pscheme_t))))
+      (define gve (register-metadata 'global (format "!DIGlobalVariableExpression(var: ~a, expr: !DIExpression())" gv)))
+      (format ", !dbg ~a" gve))
 
     (define (dbg-lambda-name dname)
       (match dname
@@ -653,8 +689,10 @@
             (f "!llvm.module.flags = !{~a, ~a}\n"
                (get-metadata 'dwarf-version)
                (get-metadata 'debuginfo-version))
-            (file-metadata ir)
+            (reserve-metadata 'file)
+            (reserve-metadata 'compunit)
             (f "!llvm.dbg.cu = !{~a}\n" (get-metadata 'compunit))
+            (pscheme-builtin-types)
             (f "%va_list = type { i32, i32, i8*, i8* }\n")
             (f "declare i64 @pscheme_internal_rest(i8*,i64)\n")
             (f "declare void @llvm.va_start(i8*)\n")
@@ -663,7 +701,8 @@
             (f "declare i64* @pscheme_allocate_cell()\n")
             (f "declare i64* @pscheme_allocate_block(i64)\n\n")
             (llvm-declare-extern ir)
-            (llvm-codegen ir))))
+            (llvm-codegen ir)
+            (file-metadata ir))))
       (sys-system (format "llc -filetype=obj ~a -o ~a" llfile objfile))
       objfile)
 
