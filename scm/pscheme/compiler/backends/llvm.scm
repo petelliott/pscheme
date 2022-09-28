@@ -78,8 +78,7 @@
     (define-pass llvm-local-debuginfo (ssa-ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
-        (define metaname (dbg-lambda-name (dname 'raw)))
-        (parameterize ((metascope (reserve-metadata metaname))
+        (parameterize ((metascope (reserve-metadata (dname 'raw)))
                        (retained-nodes '()))
           (map (lambda (arg)
                  (dbg-define-local arg (caddr arg) (cadr arg)))
@@ -87,19 +86,18 @@
           (when (rest 'raw)
               (dbg-define-local (rest 'raw) (caddr (rest 'raw)) #f))
           (insts)
-          (subprogram-metadata metaname)))
+          (subprogram-metadata (dname 'raw) (dbg-lambda-name (dname 'raw)))))
        ((entry main ,@instruction) (insts)
         (define metaname "main")
         (parameterize ((metascope (reserve-metadata metaname))
                        (retained-nodes '()))
           (insts)
-          (subprogram-metadata metaname)))
+          (subprogram-metadata metaname metaname)))
        ((entry ,library-name ,@instruction) (lib insts)
-        (define metaname (string-join "::" (map symbol->string (lib 'raw))))
-        (parameterize ((metascope (reserve-metadata metaname))
+        (parameterize ((metascope (reserve-metadata (lib 'raw)))
                        (retained-nodes '()))
           (insts)
-          (subprogram-metadata metaname))))
+          (subprogram-metadata (lib 'raw) (string-join "::" (map symbol->string (lib 'raw)))))))
 
       (op
        ((meta-define ,identifier) (i)
@@ -230,7 +228,7 @@
     (define-pass llvm-codegen (ssa-ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
-        (define meta (get-metadata (dbg-lambda-name (dname 'raw))))
+        (define meta (get-metadata (dname 'raw)))
         (f "%~a_typ = type i64 (i64*, i64~a~a)\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
@@ -275,7 +273,7 @@
         (f "    ret i32 0\n}\n\n"))
        ((entry ,library-name ,@instruction) (lib insts)
         (define name (mangle-library (lib 'raw)))
-        (define meta (get-metadata (string-join "::" (map symbol->string (lib 'raw)))))
+        (define meta (get-metadata (lib 'raw)))
         (f "@pscm_entry_called_~a = private global i1 0\n" name)
         (f "define void @pscm_entry_~a() !dbg ~a {\n"
            name meta)
@@ -674,17 +672,17 @@
                            (if (option 'debug #f) "FullDebug" "NoDebug")
                            (get-all-metadata 'global)))))
 
-    (define (subprogram-metadata name)
+    (define (subprogram-metadata key name)
       (set-metadata
-       name (format "distinct !DISubprogram(name: \"~a\", scope: ~a, file: ~a, unit: ~a, type: !DISubroutineType(types: !{null}), line: ~a, retainedNodes: !{~a})"
-                    name
-                    (get-metadata 'file)
-                    (get-metadata 'file)
-                    (get-metadata 'compunit)
-                    (if (current-span)
-                        (span-sr (current-span))
-                        "0")
-                    (string-join ", " (retained-nodes)))))
+       key (format "distinct !DISubprogram(name: \"~a\", scope: ~a, file: ~a, unit: ~a, type: !DISubroutineType(types: !{null}), line: ~a, retainedNodes: !{~a})"
+                   name
+                   (get-metadata 'file)
+                   (get-metadata 'file)
+                   (get-metadata 'compunit)
+                   (if (current-span)
+                       (span-sr (current-span))
+                       "0")
+                   (string-join ", " (retained-nodes)))))
 
     (define metascope (make-parameter #f))
 
