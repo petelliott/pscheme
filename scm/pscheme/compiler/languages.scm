@@ -219,7 +219,7 @@ clo           (vm-sym-span vm)))
          (if ,value ,value (,@instruction) ,value (,@instruction))))
        (+
         (phi
-         (phi ,identifier ,identifier ,value ,value))
+         (phi ,any ,identifier ,value ,value))
         (op
          (meta-set! ,identifier ,value)
          (if ,value ,value (,@instruction) ,value (,@instruction) (,@phi))))))

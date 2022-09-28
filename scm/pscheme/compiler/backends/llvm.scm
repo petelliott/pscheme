@@ -363,7 +363,12 @@
                   (strip-spans (otherphis)))
         (preop)
         (f "phi i64 [ ~a, %~a ], [ ~a, %~a ]~a\n"
-           (strip-spans (tphi)) tlabel (strip-spans (fphi)) flabel (location)))
+           (strip-spans (tphi)) tlabel (strip-spans (fphi)) flabel (location))
+        (for-each (lambda (phi)
+                    (match phi
+                      ((phi ,name ,new ,tval ,fval)
+                       (dbg-change-value name (caddr name) new))))
+                  (strip-spans (otherphis))))
        ((builtin ,symbol ,@value) (sym args)
         (apply emit-builtin (sym 'raw) (strip-spans (args))))
        ((return ,value) (val)
