@@ -12,6 +12,7 @@
           (pscheme compiler options)
           (pscheme compiler languages)
           (pscheme compiler file)
+          (pscheme compiler syntax)
           (pscheme compiler nanopass)
           (pscheme compiler backend)
           (pscheme compiler library)
@@ -71,6 +72,39 @@
                       (f "@~a = external global i64\n" (apply mangle decl))))
                   (delete-duplicates (declared)))
         (f "\n")))
+
+    (define retained-nodes (make-parameter '()))
+
+    (define-pass llvm-local-debuginfo (ssa-ir)
+      (toplevel-def
+       ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
+        (define metaname (dbg-lambda-name (dname 'raw)))
+        (parameterize ((metascope (reserve-metadata metaname))
+                       (retained-nodes '()))
+          (map (lambda (arg)
+                 (dbg-define-local arg (caddr arg) (cadr arg)))
+               (args 'raw))
+          (when (rest 'raw)
+              (dbg-define-local (rest 'raw) (caddr (rest 'raw)) #f))
+          (insts)
+          (subprogram-metadata metaname)))
+       ((entry main ,@instruction) (insts)
+        (define metaname "main")
+        (parameterize ((metascope (reserve-metadata metaname))
+                       (retained-nodes '()))
+          (insts)
+          (subprogram-metadata metaname)))
+       ((entry ,library-name ,@instruction) (lib insts)
+        (define metaname (string-join "::" (map symbol->string (lib 'raw))))
+        (parameterize ((metascope (reserve-metadata metaname))
+                       (retained-nodes '()))
+          (insts)
+          (subprogram-metadata metaname))))
+
+      (op
+       ((meta-define ,identifier) (i)
+        (define meta (caddr (i 'raw)))
+        (dbg-define-local (i 'raw) meta #f))))
 
     ;; codegen
 
@@ -196,7 +230,7 @@
     (define-pass llvm-codegen (ssa-ir)
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
-        (define meta (subprogram-metadata (dbg-lambda-name (dname 'raw))))
+        (define meta (get-metadata (dbg-lambda-name (dname 'raw))))
         (f "%~a_typ = type i64 (i64*, i64~a~a)\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
@@ -207,6 +241,12 @@
            (if (rest 'raw) ", ..." "")
            meta)
         (parameterize ((metascope meta))
+          (map (lambda (arg raw)
+                 (dbg-change-value raw (caddr raw) arg))
+               (args)
+               (args 'raw))
+          (when (rest 'raw)
+              (dbg-change-value (rest 'raw) (caddr (rest 'raw)) "%restarg")) ;; TODO: idk why i have to use restarg
           (insts))
         (f "}\n\n"))
        ((data ,data-name ,@any) (name contents)
@@ -228,14 +268,14 @@
         (f "@~a$~a = private global i64 0~a\n\n"
            (mangle (lib 'raw) (sym 'raw)) (num 'raw) (global-var-debug (sym 'raw) (num 'raw))))
        ((entry main ,@instruction) (insts)
-        (define meta (subprogram-metadata "main"))
+        (define meta (get-metadata "main"))
         (f "define i32 @main() !dbg ~a {\n" meta)
         (parameterize ((metascope meta))
           (insts))
         (f "    ret i32 0\n}\n\n"))
        ((entry ,library-name ,@instruction) (lib insts)
         (define name (mangle-library (lib 'raw)))
-        (define meta (subprogram-metadata (string-join "::" (map symbol->string (lib 'raw)))))
+        (define meta (get-metadata (string-join "::" (map symbol->string (lib 'raw)))))
         (f "@pscm_entry_called_~a = private global i1 0\n" name)
         (f "define void @pscm_entry_~a() !dbg ~a {\n"
            name meta)
@@ -280,13 +320,14 @@
         (f "    %valist = alloca %va_list\n")
         (f "    %valist_i = bitcast %va_list* %valist to i8*\n")
         (f "    call void @llvm.va_start(i8* %valist_i)\n")
-        (f "    %toget = sub i64 %nargs, ~a" (n 'raw))
+        (f "    %toget = sub i64 %nargs, ~a\n" (n 'raw))
         (f "    %restarg = call i64 @pscheme_internal_rest(i8* %valist_i, i64 %toget)\n")
         (f "    call void @llvm.va_end(i8* %valist_i)\n"))
        ((import ,library-name) (lname)
         (preop)
         (f "call void() @pscm_entry_~a()~a\n" (mangle-library (lname 'raw)) (location)))
        ((meta-set! ,identifier ,identifier) (l r)
+        (dbg-change-value (l 'raw) (caddr (l 'raw)) (strip-spans (r)))
         (preop)
         (ret-unspec))
        ((if ,identifier ,identifier (,@instruction) ,identifier (,@instruction) (,@phi)) (condition tphi tbranch fphi fbranch otherphis)
@@ -597,7 +638,8 @@
       (define n (if (null? (metadata))
                     0
                     (+ 1 (cdar (metadata)))))
-      (metadata (cons (cons key n) (metadata))))
+      (metadata (cons (cons key n) (metadata)))
+      (format "!~a" n))
 
     (define (set-metadata key md)
       (define slot (assoc key (metadata)))
@@ -635,15 +677,16 @@
                            (get-all-metadata 'global)))))
 
     (define (subprogram-metadata name)
-      (register-metadata
-       name (format "distinct !DISubprogram(name: \"~a\", scope: ~a, file: ~a, unit: ~a, type: !DISubroutineType(types: !{null}), line: ~a)"
+      (set-metadata
+       name (format "distinct !DISubprogram(name: \"~a\", scope: ~a, file: ~a, unit: ~a, type: !DISubroutineType(types: !{null}), line: ~a, retainedNodes: !{~a})"
                     name
                     (get-metadata 'file)
                     (get-metadata 'file)
                     (get-metadata 'compunit)
                     (if (current-span)
                         (span-sr (current-span))
-                        "0"))))
+                        "0")
+                    (string-join ", " (retained-nodes)))))
 
     (define metascope (make-parameter #f))
 
@@ -665,6 +708,26 @@
                                                n (get-metadata 'file) (get-metadata 'file) (get-metadata 'pscheme_t))))
       (define gve (register-metadata 'global (format "!DIGlobalVariableExpression(var: ~a, expr: !DIExpression())" gv)))
       (format ", !dbg ~a" gve))
+
+    (define (dbg-define-local ident metadata arg)
+      (define sym (vm-sym metadata))
+      (define m (register-metadata ident (format "!DILocalVariable(name: \"~a\", ~ascope: ~a, file: ~a, line: ~a, type: ~a)"
+                                                 (if (syntax-node? sym)
+                                                     (format "~a#~a" (syntax-node-sym sym) (syntax-node-instance sym))
+                                                     sym)
+                                                 (if arg (format "arg: ~a, " (+ 1 arg)) "")
+                                                 (metascope) (get-metadata 'file)
+                                                 (span-sr (current-span)) (get-metadata 'pscheme_t))))
+      (retained-nodes (cons m (retained-nodes))))
+
+    (define (dbg-change-value ident vm value)
+      (f "    call void @llvm.dbg.value(metadata i64 ~a, metadata ~a, metadata ~a)~a\n"
+         value
+         (get-metadata ident)
+         (if (and (vm-ever-set? vm) (vm-ever-enclosed? vm))
+             "!DIExpression()" ;; TODO: figure out how to untag this pointer
+             "!DIExpression()")
+         (location)))
 
     (define (dbg-lambda-name dname)
       (match dname
@@ -696,11 +759,14 @@
             (f "%va_list = type { i32, i32, i8*, i8* }\n")
             (f "declare i64 @pscheme_internal_rest(i8*,i64)\n")
             (f "declare void @llvm.va_start(i8*)\n")
+            (f "declare void @llvm.dbg.value(metadata, metadata, metadata)\n")
             (f "declare void @llvm.va_end(i8*)\n")
             (f "declare i64 @memmove(i64, i64, i64)\n")
             (f "declare i64* @pscheme_allocate_cell()\n")
             (f "declare i64* @pscheme_allocate_block(i64)\n\n")
             (llvm-declare-extern ir)
+            (llvm-local-debuginfo ir)
+            (f "\n")
             (llvm-codegen ir)
             (file-metadata ir))))
       (sys-system (format "llc -filetype=obj ~a -o ~a" llfile objfile))

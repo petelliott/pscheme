@@ -115,7 +115,9 @@
             (begin
               (with-toplevel (emit `(define ,@(cdr (ident 'raw)))))
               (emit `(void (global-set! ,(ident) ,(expr)))))
-            (emit `(void (set! ,(ident) ,(expr)))))))
+            (begin
+              (emit `(void (meta-define ,(ident))))
+              (emit `(void (set! ,(ident) ,(expr))))))))
 
       (lambda-name
        ((anon) ()

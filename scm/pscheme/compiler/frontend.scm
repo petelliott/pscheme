@@ -277,13 +277,13 @@
         (if (should-box (ident 'raw))
             `(begin
                (define ,(ident) (builtin cons '#f '#f))
-               (builtin set-cdr! (ref ,(ident)) ,(expr)))
+               (builtin set-car! (ref ,(ident)) ,(expr)))
             `(define ,(ident) ,(expr)))))
 
       (expression
        ((set! ,identifier ,expression) (ident expr)
         (if (should-box (ident 'raw))
-            `(builtin set-cdr! (ref ,(ident)) ,(expr))
+            `(builtin set-car! (ref ,(ident)) ,(expr))
             `(set! ,(ident) ,(expr))))
 
        ((lambda ,lambda-name (,@box) ,@proc-toplevel) (name args body)
@@ -292,7 +292,7 @@
            ,(car b) ;; make sure we accumulate the rest arguments before boxing them
            ,@(fold (lambda (arg prev)
                      (if (should-box (unbox arg))
-                         (cons `(set! ,(unbox arg) (builtin cons '#f (ref ,(unbox arg))))
+                         (cons `(set! ,(unbox arg) (builtin cons (ref ,(unbox arg)) '#f))
                                prev)
                          prev))
                    '()
