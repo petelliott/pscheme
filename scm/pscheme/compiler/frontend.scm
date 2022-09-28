@@ -301,7 +301,7 @@
 
        ((ref ,identifier) (identifier)
         (if (should-box (identifier 'raw))
-            `(builtin cdr (ref ,(identifier)))
+            `(builtin car (ref ,(identifier)))
             `(ref ,(identifier))))))
 
     (define frontend
