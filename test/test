@@ -18,4 +18,11 @@ do
     fi
 done
 rm -f a.out
+
+if [[ $exitcode == 0 ]]; then
+    echo -e "overall: \x1b[1;32mPASS\x1b[0m"
+else
+    echo -e "overall: \x1b[1;31mFAIL\x1b[0m"
+fi
+
 exit $exitcode
