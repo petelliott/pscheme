@@ -726,7 +726,9 @@
          value
          (get-metadata ident)
          (if (and (vm-ever-set? vm) (vm-ever-enclosed? vm))
-             "!DIExpression()" ;; TODO: figure out how to untag this pointer
+             ;; this case is a boxed value in the car of a cons cell
+             (get-metadata 'box-expression)
+            ; "!DIExpression()"
              "!DIExpression()")
          (location)))
 
@@ -750,6 +752,7 @@
                          (adefs '()))
             (register-metadata 'dwarf-version "!{i32 7, !\"Dwarf Version\", i32 5}")
             (register-metadata 'debuginfo-version "!{i32 2, !\"Debug Info Version\", i32 3}")
+            (register-metadata 'box-expression "!DIExpression(DW_OP_constu, 1, DW_OP_minus, DW_OP_deref)")
             (f "!llvm.module.flags = !{~a, ~a}\n"
                (get-metadata 'dwarf-version)
                (get-metadata 'debuginfo-version))
