@@ -181,7 +181,8 @@ clo           (vm-sym-span vm)))
         (closure ,number ,var-metadata)
         (ffi ,symbol)
         (tmp ,number))
-       (immediate
+       (value
+        (unspecified)
         (quote ,any)
         ,identifier)
        (toplevel-def
@@ -198,31 +199,29 @@ clo           (vm-sym-span vm)))
         (nop)
         (accumulate-rest ,number)
         (import ,library-name)
-        (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction))
-        (load-imm ,any)
-        (load-special ,symbol)
-        (builtin ,symbol ,@identifier)
+        (if ,value ,value (,@instruction) ,value (,@instruction))
+        (builtin ,symbol ,@value)
         (meta-define ,identifier)
-        (set! ,identifier ,identifier)
-        (return ,identifier)
-        (closure ,identifier ,@identifier)
+        (set! ,identifier ,value)
+        (return ,value)
+        (closure ,value ,@value)
         (closure-ref (closure ,number ,var-metadata))
         (global-ref ,identifier)
-        (global-set! ,identifier ,identifier)
-        (call ,identifier ,@identifier))))
+        (global-set! ,identifier ,value)
+        (call ,value ,@value))))
 
     (define ssa-ir
       (edit-language
        ir
        (-
         (op
-         (set! ,identifier ,identifier)
-         (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction))))
+         (set! ,identifier ,value)
+         (if ,value ,value (,@instruction) ,value (,@instruction))))
        (+
         (phi
-         (phi ,identifier ,identifier ,identifier ,identifier))
+         (phi ,identifier ,identifier ,value ,value))
         (op
-         (meta-set! ,identifier ,identifier)
-         (if ,identifier ,identifier (,@instruction) ,identifier (,@instruction) (,@phi))))))
+         (meta-set! ,identifier ,value)
+         (if ,value ,value (,@instruction) ,value (,@instruction) (,@phi))))))
 
     ))
