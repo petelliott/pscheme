@@ -4,6 +4,7 @@
         (scheme write))
 
 (import (pscheme base)
+        (pscheme getopt)
         (pscheme compiler backends llvm)
         (pscheme compiler compile)
         (pscheme compiler library)
