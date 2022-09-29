@@ -1,5 +1,6 @@
 (define-library (scheme base)
-  (import (pscheme ffi))
+  (import (pscheme ffi)
+          (pscheme options))
   (export
    ;; 7.3: Derived expression types
    cond case and or when unless let let* letrec letrec* do quasiquote
@@ -432,11 +433,11 @@
           (and (pair? obj)
                (list? (cdr obj)))))
 
-    (define (make-list n . fill)
-      (define rfill (and (pair? fill) (car fill)))
+    (define (make-list n . rest)
+      (options rest (fill #f))
       (if (eq? n 0)
           '()
-          (cons rfill (make-list (- n 1) rfill))))
+          (cons fill (make-list (- n 1) fill))))
 
     (define (list . rest)
       rest)
@@ -627,10 +628,8 @@
                 (string->list-inner string (+ start 1) end))))
 
     (define (string->list string . args)
-      (case (length args)
-        ((0) (string->list-inner string 0 (string-length string)))
-        ((1) (string->list-inner string (car args) (string-length string)))
-        ((2) (string->list-inner string (car args) (cadr args)))))
+      (options args (start 0) (end (string-length string)))
+      (string->list-inner string start end))
 
     (define (list->string-inner i list string)
       (unless (null? list)
@@ -643,22 +642,12 @@
       string)
 
     (define (string-copy string . args)
-      (case (length args)
-        ((0) (substring string 0 (string-length string)))
-        ((1) (substring string (car args) (string-length string)))
-        ((2) (substring string (car args) (cadr args)))))
+      (options args (start 0) (end (string-length string)))
+      (substring string start end))
 
     (define (string-copy! to at from . args)
-      (define len
-        (case (length args)
-          ((0) (string-length from))
-          ((1) (- (string-length from) (car args)))
-          ((2) (- (cadr args) (car args)))))
-      (define start
-        (case (length args)
-          ((0) 0)
-          ((1 2) (car args))))
-      (builtin strcpy to from len at start))
+      (options args (start 0) (end (string-length from)))
+      (builtin strcpy to from (- end start) at start))
 
     ;; TODO: string-fill!
 
@@ -686,10 +675,7 @@
       (builtin set-slot! (vector-data vector) k obj))
 
     (define (vector->list vector . rest)
-      (define start (if (null? rest) 0 (car rest)))
-      (define end (if (or (null? rest) (null? (cdr rest)))
-                      (vector-length vector)
-                      (cadr rest)))
+      (options rest (start 0) (end (vector-length vector)))
       (define (inner i)
         (if (< i end)
             (cons (vector-ref vector i)
@@ -705,33 +691,21 @@
         (vector-set! vector i (car l))))
 
     (define (vector->string vector . rest)
-      (define start (if (null? rest) 0 (car rest)))
-      (define end (if (or (null? rest) (null? (cdr rest)))
-                      (vector-length vector)
-                      (cadr rest)))
-
+      (options rest (start 0) (end (vector-length vector)))
       (do ((str (make-string (- end start)))
            (i start (+ i 1)))
           ((>= i end) str)
         (string-set! str (- i start) (vector-ref vector i))))
 
     (define (string->vector string . rest)
-      (define start (if (null? rest) 0 (car rest)))
-      (define end (if (or (null? rest) (null? (cdr rest)))
-                      (string-length string)
-                      (cadr rest)))
-
+      (options rest (start 0) (end (string-length string)))
       (do ((vector (make-vector (- end start)))
            (i start (+ i 1)))
           ((>= i end) vector)
         (vector-set! vector (- i start) (string-ref string i))))
 
     (define (vector-copy vector0 . rest)
-      (define start (if (null? rest) 0 (car rest)))
-      (define end (if (or (null? rest) (null? (cdr rest)))
-                      (vector-length vector0)
-                      (cadr rest)))
-
+      (options rest (start 0) (end (vector-length vector0)))
       (do ((vector1 (make-vector (- end start)))
            (i start (+ i 1)))
           ((>= i end) vector1)
@@ -739,11 +713,7 @@
 
     ;; TODO: memmove semantics
     (define (vector-copy! to at from . rest)
-      (define start (if (null? rest) 0 (car rest)))
-      (define end (if (or (null? rest) (null? (cdr rest)))
-                      (vector-length from)
-                      (cadr rest)))
-
+      (options rest (start 0) (end (vector-length from)))
       (do ((i start (+ i 1)))
           ((>= i end) to)
         (vector-set! to (+ at (- i start)) (vector-ref from i))))
@@ -759,10 +729,7 @@
       new-vec)
 
     (define (vector-fill! vector fill . rest)
-      (define start (if (null? rest) 0 (car rest)))
-      (define end (if (or (null? rest) (null? (cdr rest)))
-                      (vector-length vector)
-                      (cadr rest)))
+      (options rest (start 0) (end (vector-length vector)))
       (do ((i start (+ i 1)))
           ((>= i end))
         (vector-set! vector i fill))
