@@ -40,8 +40,15 @@
           (begin
             (write-string "#\\")
             (case form
-              ((#\space) (write-string "space"))
-              ((#\newline) (write-string "newline"))
+              ((#\alarm)     (write-string "alarm"))
+              ((#\backspace) (write-string "backspace"))
+              ((#\delete)    (write-string "delete"))
+              ((#\escape)    (write-string "escape"))
+              ((#\newline)   (write-string "newline"))
+              ((#\null)      (write-string "null"))
+              ((#\return)    (write-string "return"))
+              ((#\space)     (write-string "space"))
+              ((#\tab)       (write-string "tab"))
               (else (write-char form))))))
 
     ;; TODO: use parameters
