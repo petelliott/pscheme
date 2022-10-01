@@ -1,5 +1,6 @@
 (define-library (scheme write)
-  (import (scheme base))
+  (import (scheme base)
+          (pscheme record))
   (export write
           display)
   (begin
@@ -55,6 +56,10 @@
        ((vector? form)
         (write-char #\#)
         (unified-write (vector->list form) display))
+       ((record? form)
+        (write-string "#<")
+        (write-string (symbol->string (record-symbol form)))
+        (write-string ">"))
        ((char? form) (char-write form display))
        ((string? form) (string-write form display))
        ((symbol? form) (write-string (symbol->string form)))
