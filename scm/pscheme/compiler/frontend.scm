@@ -10,7 +10,8 @@
           (pscheme compiler languages)
           (pscheme compiler error)
           (pscheme compiler nanopass))
-  (export frontend)
+  (export import-pass
+          frontend)
   (begin
 
     (define (do-import libs)
@@ -304,11 +305,14 @@
             `(builtin car (ref ,(identifier)))
             `(ref ,(identifier))))))
 
-    (define frontend
+    (define import-pass
       (concat-passes
        import-and-macroexpand
        remove-syntax-nodes
-       track-defines
+       track-defines))
+
+    (define frontend
+      (concat-passes
        normalize-forms
        resolve-names
        check-args

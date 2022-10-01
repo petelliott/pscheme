@@ -741,9 +741,8 @@
        ((data ,type ,key ,sym ,number)
         (format "~a" sym))))
 
-    (define (llvm-compile ir rootname)
+    (define (llvm-compile ir rootname objfile)
       (define llfile (string-append rootname ".ll"))
-      (define objfile (string-append rootname ".o"))
       (call-with-output-file llfile
         (lambda (port)
           (parameterize ((ll-port port)
@@ -781,7 +780,10 @@
                           (string-join " " objs)
                           outfile)))
 
-    (define llvm (make-backend 'llvm llvm-compile llvm-link))
+    (define (llvm-objfile-name filename)
+      (string-append filename ".o"))
+
+    (define llvm (make-backend 'llvm llvm-compile llvm-link llvm-objfile-name))
 
 
     ))

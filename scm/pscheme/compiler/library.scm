@@ -25,9 +25,10 @@
   (begin
 
     (define-record-type library
-      (make-library name imports exports defines syntax)
+      (make-library name fresh-compile imports exports defines syntax)
       library?
       (name library-name)
+      (fresh-compile library-fresh-compile set-library-fresh-compile!)
       (imports library-imports set-library-imports!)
       (exports library-exports set-library-exports!)
       (defines library-defines set-library-defines!)
@@ -48,7 +49,7 @@
     (define libraries '())
 
     (define (new-library name imports exports)
-      (define library (make-library name imports exports '() '()))
+      (define library (make-library name (should-fresh-compile) imports exports '() '()))
       (set! libraries (cons library libraries))
       library)
 
@@ -70,9 +71,14 @@
     (define current-library (make-parameter (new-library '(r7rs-user) '() '())))
 
     (define (compile-and-import name)
-      (or (lookup-library name)
-          (compile-file (library-filename name) 'library))
-      (add-library-import! (current-library) (lookup-library name)))
+      (define lib (or (lookup-library name)
+                      (begin
+                        (compile-file (library-filename name) 'library)
+                        (lookup-library name))))
+      (should-fresh-compile (or (library-fresh-compile lib)
+                                (should-fresh-compile)))
+      (set-library-fresh-compile! (current-library) (should-fresh-compile))
+      (add-library-import! (current-library) lib))
 
     (define (find-library name curr-lib)
       (or (and (assoc name (library-defines curr-lib) syntax-equal?) curr-lib)

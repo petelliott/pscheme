@@ -1,7 +1,10 @@
 (define-library (pscheme compiler compile)
   (import (scheme base)
           (scheme file)
+          (scheme write)
           (srfi 28)
+          (srfi 18)
+          (srfi 170)
           (pscheme string)
           (pscheme formatter)
           (pscheme compiler frontend)
@@ -9,8 +12,10 @@
           (pscheme compiler options)
           (pscheme compiler file)
           (pscheme compiler backend)
-          (only (gauche base) sys-system))
+          (only (gauche base) sys-system time->seconds))
   (export compile-project
+          objfile-old
+          should-fresh-compile
           compile-file
           add-linked-object
           linking-context)
@@ -54,12 +59,37 @@
           (lambda (port)
             (writeir (strip-spans ir) port)))))
 
+    (define (needs-compile filename)
+      (or (option 'fresh)
+          (let ((objfile ((backend-objfile-namer (current-backend)) filename)))
+            (or (not (file-exists? objfile))
+                (let ((fmtime (time->seconds (file-info:mtime (file-info filename #f))))
+                      (omtime (time->seconds (file-info:mtime (file-info objfile #f)))))
+                  (<= omtime fmtime))))))
+
+    (define should-fresh-compile (make-parameter #f))
+
+    (define (status-message fmt . args)
+      (when (option 'progress)
+        (display "\x1b;[2K\r")
+        (display (apply format fmt args))))
+
     (define (compile-file filename program-or-lib)
+      (define objfile ((backend-objfile-namer (current-backend)) filename))
       (define program (read-file filename))
-      (define fir (map frontend program))
-      (define mir (middleend fir program-or-lib))
-      (writeir-for filename mir)
-      (add-linked-object ((backend-compile (current-backend)) mir filename)))
+      (parameterize ((should-fresh-compile (needs-compile filename)))
+        (status-message "[MACROEXPAND] ~a" filename)
+        (let ((me (map import-pass program)))
+          (if (should-fresh-compile)
+              (begin
+                 (status-message "[COMPILING]   ~a" filename)
+                 (let* ((fir (map frontend me))
+                        (mir (middleend fir program-or-lib)))
+                   (writeir-for filename mir)
+                   ((backend-compile (current-backend)) mir filename objfile))
+                 (status-message "[COMPILED]    ~a\n" filename))
+              (status-message "[CACHED]      ~a\n" filename))))
+      (add-linked-object objfile))
 
     (define (compile-project backend filename outfile linked-libs)
       (parameterize ((current-backend backend))
