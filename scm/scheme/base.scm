@@ -3,7 +3,7 @@
           (pscheme options))
   (export
    ;; 7.3: Derived expression types
-   cond case and or when unless let let* letrec letrec* do quasiquote
+   cond case and or when unless let let* letrec letrec* do quasiquote make-parameter parameterize
    ;; 5.5. Record-type definitions
    define-record-type
    ;; 6.1: Equivalence predicates
@@ -32,7 +32,7 @@
    vector-append vector-fill!
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
-   procedure? apply map for-each
+   procedure? apply map for-each dynamic-wind
    ;; 6.13: Input and Output
    newline write-char write-string write-u8)
   (begin
@@ -220,6 +220,49 @@
                (quasiquote rest)))
         ((_ form)
          (quote form))))
+
+    ;; TODO: gensym
+    (define <param-convert> 'ebeeb6dc-f983-425f-b30a-7865235403f0)
+
+    (define (make-parameter init . o)
+      (let* ((converter
+              (if (pair? o) (car o) (lambda (x) x)))
+             (value (converter init)))
+        (lambda args
+          (cond
+           ((null? args)
+            value)
+           ((eq? (car args) <param-convert>)
+            converter)
+           (else
+            (set! value (car args)))))))
+
+    (define-syntax parameterize
+      (syntax-rules ()
+        ((parameterize ("step")
+           ((param value p old new) ...)
+           ()
+           body)
+         (let ((p param) ...)
+           (let ((old (p)) ...
+                 (new ((p <param-convert>) value)) ...)
+             (dynamic-wind
+               (lambda () (p new) ...)
+               (lambda () . body)
+               (lambda () (p old) ...)))))
+        ((parameterize ("step")
+           args
+           ((param value) . rest)
+           body)
+         (parameterize ("step")
+           ((param value p old new) . args)
+           rest
+           body))
+        ((parameterize ((param value) ...) . body)
+         (parameterize ("step")
+           ()
+           ((param value) ...)
+           body))))
 
     ;;; 5.5. Record-type definitions
 
@@ -797,6 +840,13 @@
       (if (null? lists)
           (for-each1 proc list1)
           (for-each-inner proc (cons list1 lists))))
+
+    ;; TODO: an acutal dynamic-wind
+    (define (dynamic-wind before thunk after)
+      (before)
+      (let ((v (thunk)))
+        (after)
+        v))
 
     ;;; 6.13: Input and Output
 
