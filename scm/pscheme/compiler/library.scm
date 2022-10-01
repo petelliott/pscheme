@@ -2,6 +2,7 @@
   (import (scheme base)
           (scheme file)
           (srfi 1)
+          (srfi 28)
           (pscheme compiler compile)
           (pscheme compiler syntax)
           (pscheme string))
@@ -63,7 +64,7 @@
       (set! load-paths (cons path load-paths)))
 
     (define (library-filename name)
-      (define base-name (string-append (string-join "/" (map symbol->string name)) ".scm"))
+      (define base-name (string-append (string-join "/" (map (lambda (part) (format "~a" part)) name)) ".scm"))
       (find file-exists?
             (map (lambda (path) (string-append path "/" base-name))
                  load-paths)))
