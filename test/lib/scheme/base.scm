@@ -217,7 +217,7 @@
   (assert (equal? (assoc 'c '() (lambda (i x) #t)) #f))
   (assert (equal? (assoc 'c '((a . 1) (b . 2)) (lambda (i x) #t)) '(a . 1))))
 
-(define-test "list-copy" SKIP
+(define-test "list-copy"
   (define a '(1 2 3))
   (define b (list-copy a))
   (assert (not (eq? a b)))

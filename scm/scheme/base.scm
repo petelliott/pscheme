@@ -17,7 +17,7 @@
    ;; 6.4: Pairs and Lists
    pair? cons car cdr set-car! set-cdr! caar cadr cdar cddr null? list?
    make-list list length append reverse list-tail list-ref list-set! memq memv
-   member assq assv assoc
+   member assq assv assoc list-copy
    ;; 6.5: Symbols
    symbol? symbol->string string->symbol
    ;; 6.6: Characters
@@ -508,6 +508,12 @@
       (if (null? key)
           (assk obj lst equal?)
           (assk obj lst (car key))))
+
+    (define (list-copy lst)
+      (if (null? lst)
+          '()
+          (cons (car lst)
+                (list-copy (cdr lst)))))
 
     ;;; 6.5: Symbols
 
