@@ -3,7 +3,8 @@
           (pscheme options))
   (export
    ;; 7.3: Derived expression types
-   cond case and or when unless let let* letrec letrec* do quasiquote make-parameter parameterize
+   cond case and or when unless let let* letrec letrec* do quasiquote
+   make-parameter parameterize
    ;; 5.5. Record-type definitions
    define-record-type
    ;; 6.1: Equivalence predicates
@@ -34,7 +35,13 @@
    ;; 6.10: Control features
    procedure? apply map for-each dynamic-wind
    ;; 6.13: Input and Output
-   newline write-char write-string write-u8)
+   call-with-port input-port? output-port? textual-port? binary-port? port?
+   input-port-open? output-port-open? current-input-port current-output-port
+   current-error-port close-port close-input-port close-output-port read-char
+   peek-char eof-object? eof-object read-u8 peek-u8 newline write-char
+   write-string write-u8 flush-output-port
+   ;; my extensions
+   make-port)
   (begin
     ;;; 7.3: Derived expression types
 
@@ -850,22 +857,109 @@
 
     ;;; 6.13: Input and Output
 
+    ;;; 6.13.1: Ports
+
+    (define-record-type port
+      (make-port file* input-open output-open)
+      port?
+      (file* port-file* set-port-file*!)
+      (input-open input-port-open? set-input-port-open!)
+      (output-open output-port-open? set-output-port-open!))
+
+    (define (call-with-port port proc)
+      (proc)
+      (close-port port))
+
+    (define input-port? port?)
+    (define output-port? port?)
+    (define textual-port? port?)
+    (define binary-port? port?)
+
+    (define current-input-port
+      (make-parameter (make-port (builtin ffi-call (ffi-symbol pscheme_default_input_port_file)) #t #f)))
+    (define current-output-port
+      (make-parameter (make-port (builtin ffi-call (ffi-symbol pscheme_default_output_port_file)) #f #t)))
+    (define current-error-port
+      (make-parameter (make-port (builtin ffi-call (ffi-symbol pscheme_default_error_port_file)) #f #t)))
+
+    (define (close-port port)
+      (when (port-file* port)
+        (set-input-port-open! port #f)
+        (set-output-port-open! port #f)
+        (builtin ffi-call (ffi-symbol fclose) (port-file* port))))
+
+    (define (close-input-port port)
+      (set-input-port-open! port #f)
+      (when (not (or (input-port-open? port)
+                     (output-port-open? port)))
+        (close-port port)))
+
+    (define (close-output-port port)
+      (set-output-port-open! port #f)
+      (when (not (or (input-port-open? port)
+                     (output-port-open? port)))
+        (close-port port)))
+
+    ;;; 6.13.2: Input
+
+    (define (read-char . rest)
+      (options rest (port (current-input-port)))
+      (define num (builtin ffi->fixnum (builtin ffi-call (ffi-symbol fgetc) (port-file* port))))
+      (if (= num -1)
+          (eof-object)
+          (builtin integer->char num)))
+
+    (define (peek-char . rest)
+      (options rest (port (current-input-port)))
+      (define ch (read-char port))
+      (if (eof-object? ch)
+          ch
+          (builtin ffi-call (ffi-symbol ungetc) (builtin char->ffi ch) (port-file* port))))
+
+    (define (eof-object? obj)
+      (eq? obj (builtin eof-object)))
+
+    (define (eof-object)
+      (builtin eof-object))
+
+    (define (read-u8 . rest)
+      (options rest (port (current-input-port)))
+      (define num (builtin ffi->fixnum (builtin ffi-call (ffi-symbol fgetc) (port-file* port))))
+      (if (= num -1)
+          (eof-object)
+          num))
+
+    (define (peek-u8 . rest)
+      (options rest (port (current-input-port)))
+      (define i (read-u8 port))
+      (if (eof-object? i)
+          i
+          (builtin ffi-call (ffi-symbol ungetc) (builtin fixnum->ffi i) (port-file* port))))
+
     ;;; 6.13.3: Output
 
-    (define strprintf (ff->scheme void printf (char* fmt) (char* value)))
-    (define chprintf (ff->scheme void printf (char* fmt) (char value)))
-    (define intprintf (ff->scheme void printf (char* fmt) (int value)))
+    (define (newline . rest)
+      (options rest (port (current-output-port)))
+      (write-char #\newline port))
 
-    (define (newline)
-      (write-char #\newline))
+    (define (write-char char . rest)
+      (options rest (port (current-output-port)))
+      (builtin ffi-call (ffi-symbol fputc) (builtin char->ffi char) (port-file* port))
+      (begin))
 
-    (define (write-char char)
-      (chprintf "%c" char))
+    (define (write-string string . rest)
+      (options rest (port (current-output-port)))
+      (builtin ffi-call (ffi-symbol fputs) (builtin string->ffi string) (port-file* port))
+      (begin))
 
-    (define (write-string string)
-      (strprintf "%s" string))
+    (define (write-u8 byte . rest)
+      (options rest (port (current-output-port)))
+      (builtin ffi-call (ffi-symbol fputc) (builtin fixnum->ffi byte) (port-file* port))
+      (begin))
 
-    (define (write-u8 byte)
-      (intprintf "%c" byte))
+    (define (flush-output-port . rest)
+      (options rest (port (current-output-port)))
+      (builtin ffi-call (ffi-symbol fflush) (port-file* port))
+      (begin))
 
     ))

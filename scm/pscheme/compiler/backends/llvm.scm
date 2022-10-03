@@ -624,6 +624,10 @@
     (define-builtin (symbol->string s) (retag s PSCM-T-STRING))
     (define-builtin (string->symbol s) (retag s PSCM-T-SYMBOL))
 
+    (define-builtin (eof-object)
+      (preop)
+      (f "add i64 0, ~a\n" (tag-number PSCM-S-EOF PSCM-T-SINGLETON)))
+
     ;; debug info
     (define metadata (make-parameter '()))
 
