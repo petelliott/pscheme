@@ -34,12 +34,16 @@
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
    procedure? apply map for-each dynamic-wind
+   ;; 6.11: Exceptions
+   error
+   ;; 6.12. Environments and evaluation
    ;; 6.13: Input and Output
    call-with-port input-port? output-port? textual-port? binary-port? port?
    input-port-open? output-port-open? current-input-port current-output-port
    current-error-port close-port close-input-port close-output-port read-char
    peek-char eof-object? eof-object read-u8 peek-u8 newline write-char
    write-string write-u8 flush-output-port
+   ;; 6.14: System interface
    ;; my extensions
    make-port)
   (begin
@@ -855,6 +859,15 @@
         (after)
         v))
 
+    ;;; 6.11: Exceptions
+
+    (define (error message . objs)
+      ;; TODO: this is obviously fake lol
+      (write-string message (current-error-port))
+      (newline (current-error-port))
+      (builtin ffi-call (ffi-symbol abort)))
+
+    ;;; 6.12. Environments and evaluation
     ;;; 6.13: Input and Output
 
     ;;; 6.13.1: Ports
