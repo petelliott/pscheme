@@ -72,7 +72,8 @@
     (define (status-message fmt . args)
       (when (option 'progress)
         (display "\x1b;[2K\r")
-        (display (apply format fmt args))))
+        (display (apply format fmt args))
+        (flush-output-port)))
 
     (define (compile-file filename program-or-lib)
       (define objfile ((backend-objfile-namer (current-backend)) filename))
