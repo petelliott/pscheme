@@ -136,7 +136,7 @@
     (define (symbol-char? ch)
       (or (char-alphabetic? ch)
           (char-numeric? ch)
-          (member ch '(#\! #\$ #\& #\* #\+ #\- #\. #\/ #\: #\< #\= #\> #\? #\@ #\^ #\_ #\-))))
+          (member ch '(#\! #\$ #\% #\& #\* #\+ #\- #\. #\/ #\: #\< #\= #\> #\? #\@ #\^ #\_ #\-))))
 
     (define (cread-seq port)
       (if (symbol-char? (peek-char port))
