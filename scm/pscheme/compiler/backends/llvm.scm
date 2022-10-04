@@ -97,7 +97,7 @@
         (parameterize ((metascope (reserve-metadata (lib 'raw)))
                        (retained-nodes '()))
           (insts)
-          (subprogram-metadata (lib 'raw) (string-join "::" (map symbol->string (lib 'raw)))))))
+          (subprogram-metadata (lib 'raw) (string-join "::" (map (lambda (part) (format "~a" part)) (lib 'raw)))))))
 
       (op
        ((meta-define ,identifier) (i)

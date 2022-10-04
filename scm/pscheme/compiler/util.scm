@@ -39,7 +39,9 @@
                       str))
 
     (define (mangle-sym sym)
-      (sanitize-chars (symbol->string sym)))
+      (sanitize-chars (if (number? sym)
+                          (number->string sym)
+                          (symbol->string sym))))
 
     (define (mangle-library name)
       (string-join "$$" (append (map mangle-sym name))))
