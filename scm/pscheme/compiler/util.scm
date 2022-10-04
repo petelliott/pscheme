@@ -1,7 +1,7 @@
 (define-library (pscheme compiler util)
   (import (scheme base)
           (pscheme string)
-          (srfi-28))
+          (srfi 28))
   (export is-syntax?
           mangle-sym
           mangle

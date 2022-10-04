@@ -24,8 +24,8 @@
    ;; 6.6: Characters
    char? char=? char<? char>? char<=? char>=? char->integer integer->char
    ;; 6.7: Strings
-   string? make-string string-length string-ref string-set! string=? string<?
-   string>? string<=? string>=? substring string-append list->string
+   string? make-string string string-length string-ref string-set! string=?
+   string<?  string>? string<=? string>=? substring string-append list->string
    string->list string-copy string-copy!
    ;; 6.8: Vectors
    vector? make-vector vector vector-length vector-ref vector-set! vector->list
@@ -628,6 +628,9 @@
       (unless (null? fill)
         (memset str (car fill) k))
       str)
+
+    (define (string . chars)
+      (list->string chars))
 
     (define (string-length string)
       (strlen string))
