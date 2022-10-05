@@ -45,7 +45,7 @@
    write-string write-u8 flush-output-port
    ;; 6.14: System interface
    ;; my extensions
-   make-port)
+   make-file-port)
   (begin
     ;;; 7.3: Derived expression types
 
@@ -875,10 +875,74 @@
 
     ;;; 6.13.1: Ports
 
+    (define-record-type port-impl
+      (make-port-impl read-char peek-char read-u8 peek-u8 write-char write-u8 write-string flush close)
+      port-impl?
+      (read-char port-impl-read-char)
+      (peek-char port-impl-peek-char)
+      (read-u8 port-impl-read-u8)
+      (peek-u8 port-impl-peek-u8)
+      (write-char port-impl-write-char)
+      (write-u8 port-impl-write-u8)
+      (write-string port-impl-write-string)
+      (flush port-impl-flush)
+      (close port-impl-close))
+
+    (define (file-read-u8 file*)
+      (define num (builtin ffi->fixnum (builtin ffi-call (ffi-symbol fgetc) file*)))
+      (if (= num -1)
+          (eof-object)
+          num))
+
+    (define (file-peek-u8 file*)
+      (define i (file-read-u8 file*))
+      (if (eof-object? i)
+          i
+          (builtin ffi-call (ffi-symbol ungetc) (builtin fixnum->ffi i) file*)))
+
+    (define (file-read-char file*)
+      (define i (file-read-u8 file*))
+      (if (eof-object? i) i (integer->char i)))
+
+    (define (file-peek-char file*)
+      (define i (file-peek-u8 file*))
+      (if (eof-object? i) i (integer->char i)))
+
+    (define (file-write-u8 file* i)
+      (builtin ffi-call (ffi-symbol fputc) (builtin fixnum->ffi i) file*))
+
+    (define (file-write-char file* c)
+      (file-write-u8 file* (char->integer c)))
+
+    (define (file-write-string file* string)
+      (builtin ffi-call (ffi-symbol fputs) (builtin string->ffi string) file*))
+
+    (define (file-flush file*)
+      (builtin ffi-call (ffi-symbol fflush) file*))
+
+    (define (file-close file*)
+      (builtin ffi-call (ffi-symbol fclose) file*))
+
+    (define port-file-impl
+      (make-port-impl
+       file-read-char
+       file-peek-char
+       file-read-u8
+       file-peek-u8
+       file-write-char
+       file-write-u8
+       file-write-string
+       file-flush
+       file-close))
+
+    (define (make-file-port file input-open output-open)
+      (make-port port-file-impl file input-open output-open))
+
     (define-record-type port
-      (make-port file* input-open output-open)
+      (make-port impl data input-open output-open)
       port?
-      (file* port-file* set-port-file*!)
+      (impl port-impl)
+      (data port-data)
       (input-open input-port-open? set-input-port-open!)
       (output-open output-port-open? set-output-port-open!))
 
@@ -892,17 +956,17 @@
     (define binary-port? port?)
 
     (define current-input-port
-      (make-parameter (make-port (builtin ffi-call (ffi-symbol pscheme_default_input_port_file)) #t #f)))
+      (make-parameter (make-file-port (builtin ffi-call (ffi-symbol pscheme_default_input_port_file)) #t #f)))
     (define current-output-port
-      (make-parameter (make-port (builtin ffi-call (ffi-symbol pscheme_default_output_port_file)) #f #t)))
+      (make-parameter (make-file-port (builtin ffi-call (ffi-symbol pscheme_default_output_port_file)) #f #t)))
     (define current-error-port
-      (make-parameter (make-port (builtin ffi-call (ffi-symbol pscheme_default_error_port_file)) #f #t)))
+      (make-parameter (make-file-port (builtin ffi-call (ffi-symbol pscheme_default_error_port_file)) #f #t)))
 
     (define (close-port port)
-      (when (port-file* port)
-        (set-input-port-open! port #f)
-        (set-output-port-open! port #f)
-        (builtin ffi-call (ffi-symbol fclose) (port-file* port))))
+      (define impl (port-impl port))
+      (set-input-port-open! port #f)
+      (set-output-port-open! port #f)
+      ((port-impl-close (port-impl port)) (port-data port)))
 
     (define (close-input-port port)
       (set-input-port-open! port #f)
@@ -918,39 +982,27 @@
 
     ;;; 6.13.2: Input
 
-    (define (read-char . rest)
-      (options rest (port (current-input-port)))
-      (define num (builtin ffi->fixnum (builtin ffi-call (ffi-symbol fgetc) (port-file* port))))
-      (if (= num -1)
-          (eof-object)
-          (builtin integer->char num)))
-
-    (define (peek-char . rest)
-      (options rest (port (current-input-port)))
-      (define ch (read-char port))
-      (if (eof-object? ch)
-          ch
-          (builtin ffi-call (ffi-symbol ungetc) (builtin char->ffi ch) (port-file* port))))
-
     (define (eof-object? obj)
       (eq? obj (builtin eof-object)))
 
     (define (eof-object)
       (builtin eof-object))
 
+    (define (read-char . rest)
+      (options rest (port (current-input-port)))
+      ((port-impl-read-char (port-impl port)) (port-data port)))
+
+    (define (peek-char . rest)
+      (options rest (port (current-input-port)))
+      ((port-impl-peek-char (port-impl port)) (port-data port)))
+
     (define (read-u8 . rest)
       (options rest (port (current-input-port)))
-      (define num (builtin ffi->fixnum (builtin ffi-call (ffi-symbol fgetc) (port-file* port))))
-      (if (= num -1)
-          (eof-object)
-          num))
+      ((port-impl-read-u8 (port-impl port)) (port-data port)))
 
     (define (peek-u8 . rest)
       (options rest (port (current-input-port)))
-      (define i (read-u8 port))
-      (if (eof-object? i)
-          i
-          (builtin ffi-call (ffi-symbol ungetc) (builtin fixnum->ffi i) (port-file* port))))
+      ((port-impl-peek-u8 (port-impl port)) (port-data port)))
 
     ;;; 6.13.3: Output
 
@@ -960,22 +1012,22 @@
 
     (define (write-char char . rest)
       (options rest (port (current-output-port)))
-      (builtin ffi-call (ffi-symbol fputc) (builtin char->ffi char) (port-file* port))
+      ((port-impl-write-char (port-impl port)) (port-data port) char)
       (begin))
 
     (define (write-string string . rest)
       (options rest (port (current-output-port)))
-      (builtin ffi-call (ffi-symbol fputs) (builtin string->ffi string) (port-file* port))
+      ((port-impl-write-string (port-impl port)) (port-data port) string)
       (begin))
 
     (define (write-u8 byte . rest)
       (options rest (port (current-output-port)))
-      (builtin ffi-call (ffi-symbol fputc) (builtin fixnum->ffi byte) (port-file* port))
+      ((port-impl-write-u8 (port-impl port)) (port-data port) byte)
       (begin))
 
     (define (flush-output-port . rest)
       (options rest (port (current-output-port)))
-      (builtin ffi-call (ffi-symbol fflush) (port-file* port))
+      ((port-impl-flush (port-impl port)) (port-data port))
       (begin))
 
     ))

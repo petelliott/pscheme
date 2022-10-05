@@ -25,12 +25,12 @@
             (thunk)))))
 
     (define (open-input-file string)
-      (make-port (builtin ffi-call (ffi-symbol fopen) (builtin string->ffi string) (builtin string->ffi "r")) #t #f))
+      (make-file-port (builtin ffi-call (ffi-symbol fopen) (builtin string->ffi string) (builtin string->ffi "r")) #t #f))
 
     (define open-binary-input-file open-input-file)
 
     (define (open-output-file string)
-      (make-port (builtin ffi-call (ffi-symbol fopen) (builtin string->ffi string) (builtin string->ffi "w+")) #f #t))
+      (make-file-port (builtin ffi-call (ffi-symbol fopen) (builtin string->ffi string) (builtin string->ffi "w+")) #f #t))
 
     (define open-binary-output-file open-output-file)
 
