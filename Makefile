@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -g -fno-omit-frame-pointer -I.
+CFLAGS=-Wall -g -fno-omit-frame-pointer -I. -fPIE
 
 RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/rest.o runtime/apply.o runtime/gdb_exts.o runtime/ports.o
 RUNTIME_TARGET=runtime/runtime.a

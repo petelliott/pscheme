@@ -776,7 +776,7 @@
             (f "\n")
             (llvm-codegen ir)
             (file-metadata ir))))
-      (sys-system (format "llc -filetype=obj ~a -o ~a" llfile objfile))
+      (sys-system (format "llc --relocation-model=pic -filetype=obj ~a -o ~a" llfile objfile))
       objfile)
 
     (define (llvm-link objs outfile)
