@@ -77,6 +77,7 @@
 
     (define (compile-file filename program-or-lib)
       (define objfile ((backend-objfile-namer (current-backend)) filename))
+      (define _dummy (status-message "[READ]        ~a" filename))
       (define program (read-file filename))
       (parameterize ((should-fresh-compile (needs-compile filename)))
         (status-message "[MACROEXPAND] ~a" filename)

@@ -1,6 +1,5 @@
 (define-library (pscheme compiler options)
-  (import (scheme base)
-          (srfi 39))
+  (import (scheme base))
   (export opt-param
           option
           optionize)

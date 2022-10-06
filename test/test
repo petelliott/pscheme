@@ -7,7 +7,7 @@ exitcode=0
 for test in $(find $script_dir -name '*.scm')
 do
     echo $test
-    $script_dir/../pscheme $test
+    $script_dir/../pscheme $@ $test
     if [[ $? -ne 0 ]]; then
         exitcode=1
     else

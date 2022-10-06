@@ -18,7 +18,7 @@
         ((_ int arg) (builtin ffi->fixnum arg))
         ((_ char arg) (builtin ffi->fixnum arg))
         ((_ void arg) (begin arg (begin)))
-        ((_ bool arg) (if (eq? arg 0) #f #t))))
+        ((_ bool arg) (if (builtin eq? arg 0) #f #t))))
 
     (define-syntax ff->scheme
       (syntax-rules ()

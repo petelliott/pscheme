@@ -44,17 +44,17 @@
     (define char-lower-case? (ff->scheme bool islower (char c)))
 
     (define (digit-value ch)
-      (if (and (char>=? ch #\0) (char<=? #\9))
+      (if (and (char>=? ch #\0) (char<=? ch #\9))
           (- (char->integer ch) (char->integer #\0))
           #f))
 
     (define (char-upcase ch)
-      (if (and (char>=? ch #\a) (char<=? #\z))
+      (if (and (char>=? ch #\a) (char<=? ch #\z))
           (integer->char (- (char->integer ch) 32))
           ch))
 
     (define (char-downcase ch)
-      (if (and (char>=? ch #\A) (char<=? #\Z))
+      (if (and (char>=? ch #\A) (char<=? ch #\Z))
           (integer->char (+ (char->integer ch) 32))
           ch))
 
