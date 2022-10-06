@@ -663,8 +663,9 @@
                  s1 (cons s2 rest)))
 
     (define (substring string start end)
-      (define new (make-string length))
-      (builtin strcpy new string (- end start) 0 start)
+      (define len (- end start))
+      (define new (make-string len))
+      (builtin strcpy new string len 0 start)
       new)
 
     ; TODO: write fold
