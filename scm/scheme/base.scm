@@ -40,9 +40,10 @@
    ;; 6.13: Input and Output
    call-with-port input-port? output-port? textual-port? binary-port? port?
    input-port-open? output-port-open? current-input-port current-output-port
-   current-error-port close-port close-input-port close-output-port read-char
-   peek-char eof-object? eof-object read-u8 peek-u8 newline write-char
-   write-string write-u8 flush-output-port
+   current-error-port close-port close-input-port close-output-port
+   open-input-string open-output-string get-output-string read-char peek-char
+   eof-object? eof-object read-u8 peek-u8 newline write-char write-string write-u8
+   flush-output-port
    ;; 6.14: System interface
    ;; my extensions
    make-file-port)
@@ -876,6 +877,8 @@
 
     ;;; 6.13.1: Ports
 
+    ;;; file ports
+
     (define-record-type port-impl
       (make-port-impl read-char peek-char read-u8 peek-u8 write-char write-u8 write-string flush close)
       port-impl?
@@ -939,11 +942,108 @@
     (define (make-file-port file input-open output-open)
       (make-port port-file-impl file input-open output-open))
 
+    ;;; string ports
+    (define-record-type string-builder
+      (construct-string-builder buff len cap)
+      string-builder?
+      (buff sb-buff sb-set-buff!)
+      (len sb-len sb-set-len!)
+      (cap sb-cap sb-set-cap!))
+
+    (define (make-string-builder . args)
+      (options args (init #f))
+      (if init
+          (let ((l (string-length init)))
+            (construct-string-builder init l l))
+          ;; 15 so it fits in a cell
+          (construct-string-builder (make-string 15) 0 15)))
+
+    (define (make-space builder obj-size)
+      (unless (>= (sb-cap builder) (+ (sb-len builder) obj-size))
+        (let* ((newcap (+ obj-size (* (sb-cap builder) 2)))
+               (newstr (make-string newcap)))
+          (string-copy! newstr 0 (sb-buff builder))
+          (sb-set-buff! builder newstr)
+          (sb-set-cap! builder newcap))))
+
+    (define (string-builder-append builder obj)
+      (if (char? obj)
+          (begin
+            (make-space builder 1)
+            (string-set! (sb-buff builder) (sb-len builder) obj)
+            (sb-set-len! builder (+ 1 (sb-len builder))))
+          (let ((len (string-length obj)))
+            (make-space builder len)
+            (string-copy! (sb-buff builder) (sb-len builder) obj)
+            (sb-set-len! builder (+ len (sb-len builder))))))
+
+    (define (string-builder-build builder)
+      (string-copy (sb-buff builder) 0 (sb-len builder)))
+
+    (define (string-builder-data builder)
+      (make-space builder 1)
+      (string-set! (sb-buff builder) (sb-len builder) #\null)
+      (sb-buff builder))
+
+    (define (string-builder-length builder)
+      (sb-len builder))
+
+    (define-record-type string-port-data
+      (make-string-port-data sb roff)
+      string-port-data?
+      (sb spd-sb)
+      (roff spd-roff spd-set-roff!))
+
+    (define (string-read-char spd)
+      (define ch (string-peek-char spd))
+      (unless (eof-object? ch)
+        (spd-set-roff! spd (+ 1 (spd-roff spd))))
+      ch)
+
+    (define (string-peek-char spd)
+      (define sb (spd-sb spd))
+      (if (>= (spd-roff spd) (string-builder-length sb))
+          (eof-object)
+          (string-ref (string-builder-data sb) (spd-roff spd))))
+
+    (define (string-read-u8 spd)
+      (define ch (string-read-char spd))
+      (if (eof-object? ch)
+          ch
+          (char->integer ch)))
+
+    (define (string-peek-u8 spd)
+      (define ch (string-peek-char spd))
+      (if (eof-object? ch)
+          ch
+          (char->integer ch)))
+
+    (define (string-write-char spd ch)
+      (string-builder-append (spd-sb spd) ch))
+
+    (define (string-write-u8 spd byte)
+      (string-write-char spd (integer->char byte)))
+
+    (define (string-write-string spd str)
+      (string-builder-append (spd-sb spd) str))
+
+    (define string-port-impl
+      (make-port-impl
+       string-read-char
+       string-peek-char
+       string-read-u8
+       string-peek-u8
+       string-write-char
+       string-write-u8
+       string-write-string
+       (lambda (spd) #f)
+       (lambda (spd) #f)))
+
     (define-record-type port
       (make-port impl data input-open output-open)
       port?
       (impl port-impl)
-      (data port-data)
+      (data port-data set-port-data!)
       (input-open input-port-open? set-input-port-open!)
       (output-open output-port-open? set-output-port-open!))
 
@@ -967,7 +1067,9 @@
       (define impl (port-impl port))
       (set-input-port-open! port #f)
       (set-output-port-open! port #f)
-      ((port-impl-close (port-impl port)) (port-data port)))
+      ((port-impl-close (port-impl port)) (port-data port))
+      (set-port-data! port #f)
+      (begin))
 
     (define (close-input-port port)
       (set-input-port-open! port #f)
@@ -980,6 +1082,17 @@
       (when (not (or (input-port-open? port)
                      (output-port-open? port)))
         (close-port port)))
+
+    (define (open-input-string string)
+      (make-port string-port-impl (make-string-port-data (make-string-builder string) 0) #t #f))
+
+    (define (open-output-string)
+      (make-port string-port-impl (make-string-port-data (make-string-builder) 0) #f #t))
+
+    (define (get-output-string port)
+      (unless (eq? (port-impl port) string-port-impl)
+        (error "call to get-output-string on a non-string port"))
+      (string-builder-build (spd-sb (port-data port))))
 
     ;;; 6.13.2: Input
 
