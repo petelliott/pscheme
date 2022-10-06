@@ -517,10 +517,16 @@
           0
           (+ 1 (length (cdr obj)))))
 
-    (define (append a b)
+    (define (append2 a b)
       (if (null? a)
           b
           (cons (car a) (append (cdr a) b))))
+
+    (define (append . lists)
+      (cond
+       ((null? lists) '())
+       ((null? (cdr lists)) (car lists))
+       (else (append2 (car lists) (apply append (cdr lists))))))
 
     (define (reverse-inner lst onto)
       (if (null? lst)
