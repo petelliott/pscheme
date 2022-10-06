@@ -13,6 +13,7 @@
    number? complex? real? rational? integer? exact? inexact?
    exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
    negative? max min + * - / quotient remainder modulo abs number->string
+   string->number
    ;; 6.3: Booleans
    not boolean? boolean=?
    ;; 6.4: Pairs and Lists
@@ -450,6 +451,32 @@
               (loop (quotient n radix))
               (write-char (integer->char (+ (char->integer #\0) (remainder n radix))) port)))))
       (get-output-string port))
+
+    (define (hex-digit-value ch)
+      (cond
+       ((and (char>=? ch #\0) (char<=? ch #\9))
+        (- (char->integer ch) (char->integer #\0)))
+       ;; hex support is an extension
+       ((and (char>=? ch #\A) (char<=? ch #\Z))
+        (+ 10 (- (char->integer ch) (char->integer #\A))))
+       ((and (char>=? ch #\a) (char<=? ch #\z))
+        (+ 10 (- (char->integer ch) (char->integer #\a))))
+       (else #f)))
+
+    (define (string->number-inner string i l n r)
+      (define chn (hex-digit-value (string-ref string i)))
+      (cond
+       ((>= i l) n)
+       ((not chn) #f)
+       ((>= chn r) #f)
+       (else
+        (string->number-inner string (+ i 1) l (+ (* n r) chn) r))))
+
+    (define (string->number string . args)
+      (options args (radix 10))
+      (if (char=? (string-ref string 0) #\-)
+          (- (string->number-inner string 1 (string-length string) 0 radix))
+          (string->number-inner string 0 (string-length string) 0 radix)))
 
     ;;; 6.3: Booleans
 
