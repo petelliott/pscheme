@@ -12,7 +12,7 @@
    ;; 6.2: Numbers
    number? complex? real? rational? integer? exact? inexact?
    exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
-   negative? max min + * - / quotient remainder modulo abs
+   negative? max min + * - / quotient remainder modulo abs number->string
    ;; 6.3: Booleans
    not boolean? boolean=?
    ;; 6.4: Pairs and Lists
@@ -435,6 +435,21 @@
       (if (negative? n)
           (- n)
           n))
+
+    (define (number->string z . args)
+      (options args (radix 10))
+      (define port (open-output-string))
+      (if (zero? z)
+          (write-char #\0 port)
+          (let loop ((n z))
+            (cond
+             ((negative? n)
+              (write-char #\- port)
+              (loop (- n)))
+             ((not (zero? n))
+              (loop (quotient n radix))
+              (write-char (integer->char (+ (char->integer #\0) (remainder n radix))) port)))))
+      (get-output-string port))
 
     ;;; 6.3: Booleans
 
