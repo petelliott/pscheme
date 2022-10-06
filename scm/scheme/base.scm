@@ -42,8 +42,8 @@
    input-port-open? output-port-open? current-input-port current-output-port
    current-error-port close-port close-input-port close-output-port
    open-input-string open-output-string get-output-string read-char peek-char
-   eof-object? eof-object read-u8 peek-u8 newline write-char write-string write-u8
-   flush-output-port
+   read-line eof-object? eof-object read-u8 peek-u8 newline write-char
+   write-string write-u8 flush-output-port
    ;; 6.14: System interface
    ;; my extensions
    make-file-port)
@@ -1130,6 +1130,14 @@
     (define (peek-char . rest)
       (options rest (port (current-input-port)))
       ((port-impl-peek-char (port-impl port)) (port-data port)))
+
+    (define (read-line . rest)
+      (options rest (port (current-input-port)))
+      (do ((sb (make-string-builder))
+           (ch (read-char port) (read-char port)))
+          ((or (eof-object? ch) (char=? ch #\newline))
+           (string-builder-build sb))
+        (string-builder-append sb ch)))
 
     (define (read-u8 . rest)
       (options rest (port (current-input-port)))
