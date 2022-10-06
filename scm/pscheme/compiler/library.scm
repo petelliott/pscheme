@@ -1,11 +1,5 @@
 (define-library (pscheme compiler library)
-  (import (scheme base)
-          (scheme file)
-          (srfi 1)
-          (srfi 28)
-          (pscheme compiler compile)
-          (pscheme compiler syntax)
-          (pscheme string))
+  ;; TODO: fix compiler to not require this export-before-import shit
   (export library?
           library-name
           library-imports
@@ -23,6 +17,13 @@
           lookup-syntax
           lookup-global
           compile-and-import)
+  (import (scheme base)
+          (scheme file)
+          (srfi 1)
+          (srfi 28)
+          (pscheme compiler compile)
+          (pscheme compiler syntax)
+          (pscheme string))
   (begin
 
     (define-record-type library

@@ -35,7 +35,7 @@
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
-        (define lib (new-library (strip-syntax-nodes (name 'raw)) () ()))
+        (define lib (new-library (strip-syntax-nodes (name 'raw)) '() '()))
         (parameterize ((current-library lib))
           `(define-library ,(name) ,@(decls))))
        ((import ,@library-name) (names)
@@ -132,14 +132,15 @@
 
     (define (rest-arg arg-list)
       (cond
-       ((symbol? arg-list) (make-var-metadata arg-list #f #f))
+       ((or (symbol? arg-list) (syntax-node? arg-list)) (make-var-metadata arg-list #f #f))
        ((null? arg-list) #f)
        ((pair? arg-list) (rest-arg (cdr arg-list)))
        (else (error "malformed argument list" arg-list))))
 
     (define (regular-args arg-list onto)
       (if (or (null? arg-list)
-              (symbol? arg-list))
+              (symbol? arg-list)
+              (syntax-node? arg-list))
           onto
           (regular-args (cdr arg-list)
                         (cons (make-var-metadata (car arg-list) #f #f) onto))))
@@ -156,7 +157,7 @@
                  (lookup-global (syntax-node-sym sym) (syntax-node-env sym)))
             (pscm-err "undefined variable ~a" (strip-syntax-nodes sym))))
        ((and (frame-rest-arg frame)
-             (eq? sym (vm-sym (frame-rest-arg frame))))
+             (vm-cmp sym (vm-sym (frame-rest-arg frame))))
         `(arg rest ,(frame-rest-arg frame)))
        ((member sym (frame-locals frame) vm-cmp) =>
         (lambda (m)

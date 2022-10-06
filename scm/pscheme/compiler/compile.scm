@@ -1,4 +1,11 @@
 (define-library (pscheme compiler compile)
+  ;; TODO: fix compiler to not require this export-before-import shit
+  (export compile-project
+          objfile-old
+          should-fresh-compile
+          compile-file
+          add-linked-object
+          linking-context)
   (import (scheme base)
           (scheme file)
           (scheme write)
@@ -13,12 +20,6 @@
           (pscheme compiler file)
           (pscheme compiler backend)
           (only (gauche base) sys-system time->seconds))
-  (export compile-project
-          objfile-old
-          should-fresh-compile
-          compile-file
-          add-linked-object
-          linking-context)
   (begin
 
     (define (read-file filename)
