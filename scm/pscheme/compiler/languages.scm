@@ -120,7 +120,7 @@
 
     (define (vm-span vm)
       (and (span? (vm-sym-span vm))
-clo           (vm-sym-span vm)))
+           (vm-sym-span vm)))
 
     ;; TODO: this is a really ugly hack
     (define-record-type box
