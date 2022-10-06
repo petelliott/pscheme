@@ -108,6 +108,23 @@
          (cons (cread-any port)
                (cread-list port)))))
 
+    (define (hex-digit-value ch)
+      (cond
+       ((and (char>=? ch #\0) (char<=? ch #\9))
+        (- (char->integer ch) (char->integer #\0)))
+       ;; hex support is an extension
+       ((and (char>=? ch #\A) (char<=? ch #\Z))
+        (+ 10 (- (char->integer ch) (char->integer #\A))))
+       ((and (char>=? ch #\a) (char<=? ch #\z))
+        (+ 10 (- (char->integer ch) (char->integer #\a))))
+       (else #f)))
+
+    (define (hex-escape port n)
+      (define ch (get-char port))
+      (if (char=? ch #\;)
+          (integer->char n)
+          (hex-escape port (+ (* n 16) (hex-digit-value ch)))))
+
     (define (cread-string port)
       (define (inner)
         (define ch (begin
@@ -127,7 +144,9 @@
               ((#\\) #\\)
               ((#\|) #\|)
               ((#\newline) #\newline)
-              ((#\e) #\escape)) ;; non-standard extension
+              ((#\e) #\escape) ;; non-standard extension
+              ((#\x) (hex-escape port 0))
+              (else (pscm-err (with-span #f) "read: unrecognized string escape")))
             (inner)))
           (else
            (cons ch (inner)))))
