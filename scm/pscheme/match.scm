@@ -34,7 +34,7 @@
                (match-chain expr rest ...)
                m)))
         ((_ expr)
-         (values))))
+         (if #f #f))))
 
     (define-syntax match
       (syntax-rules ()
