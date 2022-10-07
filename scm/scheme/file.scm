@@ -3,7 +3,7 @@
           (pscheme ffi))
   (export call-with-input-file call-with-output-file with-input-from-file
           with-output-to-file open-input-file open-binary-input-file
-          open-output-file open-binary-output-file)
+          open-output-file open-binary-output-file file-exists?)
   (begin
 
     (define (call-with-input-file string proc)
@@ -33,5 +33,8 @@
       (make-file-port (builtin ffi-call (ffi-symbol fopen) (builtin string->ffi string) (builtin string->ffi "w+")) #f #t))
 
     (define open-binary-output-file open-output-file)
+
+    (define (file-exists? filename)
+      (= 0 (builtin ffi-call (ffi-symbol access) (builtin string->ffi filename) (builtin fixnum->ffi 0))))
 
     ))
