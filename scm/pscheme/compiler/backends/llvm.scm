@@ -5,6 +5,7 @@
           (scheme cxr)
           (srfi 28)
           (srfi 1)
+          (gauche base)
           (pscheme base)
           (pscheme string)
           (pscheme match)
@@ -15,8 +16,7 @@
           (pscheme compiler syntax)
           (pscheme compiler nanopass)
           (pscheme compiler backend)
-          (pscheme compiler library)
-          (only (gauche base) sys-system))
+          (pscheme compiler library))
   (export llvm)
   (begin
 

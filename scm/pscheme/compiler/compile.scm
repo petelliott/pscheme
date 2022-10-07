@@ -18,8 +18,7 @@
           (pscheme compiler middleend)
           (pscheme compiler options)
           (pscheme compiler file)
-          (pscheme compiler backend)
-          (only (gauche base) sys-system time->seconds))
+          (pscheme compiler backend))
   (begin
 
     (define (read-file filename)
