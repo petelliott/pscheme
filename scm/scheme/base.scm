@@ -12,7 +12,7 @@
    ;; 6.2: Numbers
    number? complex? real? rational? integer? exact? inexact?
    exact-integer? finite? infinite? nan? = < <= > >= zero? positive?
-   negative? max min + * - / quotient remainder modulo abs number->string
+   negative? max min + * - / quotient remainder modulo abs expt number->string
    string->number
    ;; 6.3: Booleans
    not boolean? boolean=?
@@ -436,6 +436,11 @@
       (if (negative? n)
           (- n)
           n))
+
+    (define (expt z1 z2)
+      (if (zero? z2)
+          1
+          (* z1 (expt z1 (- z2 1)))))
 
     (define (number->string z . args)
       (options args (radix 10))
