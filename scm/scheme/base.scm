@@ -953,9 +953,9 @@
 
     (define (file-peek-u8 file*)
       (define i (file-read-u8 file*))
-      (if (eof-object? i)
-          i
-          (builtin ffi-call (ffi-symbol ungetc) (builtin fixnum->ffi i) file*)))
+      (unless (eof-object? i)
+        (builtin ffi-call (ffi-symbol ungetc) (builtin fixnum->ffi i) file*))
+      i)
 
     (define (file-read-char file*)
       (define i (file-read-u8 file*))
