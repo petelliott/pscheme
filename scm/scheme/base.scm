@@ -947,7 +947,9 @@
 
     (define (file-read-u8 file*)
       (define num (builtin ffi->fixnum (builtin ffi-call (ffi-symbol fgetc) file*)))
-      (if (= num -1)
+      ;; TODO: this is obviously very sketchy
+      ;; this is 32-bit -1
+      (if (= num 4294967295)
           (eof-object)
           num))
 
@@ -1101,8 +1103,9 @@
       (output-open output-port-open? set-output-port-open!))
 
     (define (call-with-port port proc)
-      (proc)
-      (close-port port))
+      (define ret (proc))
+      (close-port port)
+      ret)
 
     (define input-port? port?)
     (define output-port? port?)

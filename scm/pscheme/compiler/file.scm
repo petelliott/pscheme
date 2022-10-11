@@ -236,7 +236,7 @@
              (else
               (let ((seq (cread-seq port)))
                 (if (null? seq)
-                    (pscm-err (with-span #f) "read: unexpected character ~a" (peek-char port))
+                    (pscm-err (with-span #f) "read: unexpected character ~a (ascii ~a)" (peek-char port) (char->integer (peek-char port)))
                     (seq->symbol-or-number seq))))))))
 
     (define (span-read-all port filename)
