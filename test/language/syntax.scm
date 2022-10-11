@@ -63,4 +63,13 @@
   (assert (equal? (nested-ellipsis (1 2 3 4) (5 6 7 8) (9 10 11 12))
                   '((1 2 3 4) (5 6 7 8) (9 10 11 12)))))
 
+(define-syntax nested-ellipsis2
+  (syntax-rules ()
+    ((_ ((b ...) ...) ...)
+     '(((b ...) ...) ...))))
+
+(define-test "unprefixed nested ellipsis"
+  (assert (equal? (nested-ellipsis2 ((1 2) (3 4)) ((5 6) (7 8)) ((9 10) (11 12)))
+                  '(((1 2) (3 4)) ((5 6) (7 8)) ((9 10) (11 12))))))
+
 (finish-tests)

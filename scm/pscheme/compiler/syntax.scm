@@ -80,11 +80,21 @@
        (else
         (get-match name address (cdr matches)))))
 
+    (define (all-zero lst)
+      (cond
+       ((null? lst) #t)
+       ((not (zero? (car lst))) #f)
+       (else (all-zero (cdr lst)))))
+
+    (define (zero-past-first prefix addr)
+      (all-zero (list-tail addr (+ 1 (length prefix)))))
+
     (define (get-matches name address matches)
       (cond
        ((null? matches) '())
        ((and (eq? name (match-name (car matches)))
-             (is-subaddress address (match-address (car matches))))
+             (is-subaddress address (match-address (car matches)))
+             (zero-past-first address (match-address (car matches))))
         (cons (car matches)
               (get-matches name address (cdr matches))))
        (else
@@ -96,7 +106,7 @@
        ((equal? a b) a)
        (else (pscm-err msg))))
 
-    (define (pattern-reps form addr matches)
+    (define (pattern-reps-top form addr matches)
       (cond
        ((is-ellipsis? form) #f)
        ((symbol? form)
@@ -106,10 +116,36 @@
               l)))
        ((pair? form)
         (equalize-through-error
-         (pattern-reps (car form) addr matches)
-         (pattern-reps (cdr form) addr matches)
+         (pattern-reps-top (car form) addr matches)
+         (pattern-reps-top (cdr form) addr matches)
          "different lengths of ellipsis match in same expansion"))
        (else #f)))
+
+    (define (fmax a b)
+      (cond
+       ((not a) b)
+       ((not b) a)
+       (else (max a b))))
+
+    (define (pattern-reps-nested form addr matches)
+      (cond
+       ((is-ellipsis? form)
+        (fmax (pattern-reps-nested (car form) addr matches)
+              (pattern-reps-nested (cddr form) addr matches)))
+       ((symbol? form)
+        (let ((l (length (get-matches form addr matches))))
+          (if (= l 0)
+              #f
+              l)))
+       ((pair? form)
+        (fmax
+         (pattern-reps-nested (car form) addr matches)
+         (pattern-reps-nested (cdr form) addr matches)))
+       (else #f)))
+
+    (define (pattern-reps form addr matches)
+      (or (pattern-reps-top form addr matches)
+          (pattern-reps-nested form addr matches)))
 
     (define-record-type syntax-node
       (make-syntax-node sym env instance)
