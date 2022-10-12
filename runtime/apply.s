@@ -14,12 +14,23 @@ pscheme_internal_apply:
     mov (%rax), %rax
     push %rax      /* fn */
     mov %rdx, %r11 /* args */
+    /* make sure stack is 16 byte aligned. ugh */
+    sub $8, %rsp
 
     /* allocate space for the non-register args */
     mov %rsi, %r10
     sub $4, %r10
     cmp $0, %r10
     jle .Lskipstack
+
+    /* make sure stack is 16 byte aligned. ugh */
+    mov %r10, %rax
+    and $1, %rax
+    cmp $0, %rax
+    je .Lskipstackpad
+    sub $8, %rsp
+.Lskipstackpad:
+
     shl $3, %r10
     sub %r10, %rsp
 .Lskipstack:
