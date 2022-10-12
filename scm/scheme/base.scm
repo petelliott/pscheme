@@ -631,9 +631,18 @@
     (define (symbol->string obj)
       (builtin symbol->string obj))
 
-    ;; TODO: intern symbols
+    (define comptime-symbol-defined
+      (ff->scheme pscheme_t pscheme_comptime_symbol_defined (pscheme_t s)))
+    (define intern-list '())
     (define (string->symbol obj)
-      (builtin string->symbol obj))
+      (cond
+       ((comptime-symbol-defined obj))
+       ((assoc obj intern-list) => cdr)
+       (else
+        (let* ((copy (string-copy obj))
+               (sym (builtin string->symbol copy)))
+          (set! intern-list (cons (cons copy sym) intern-list))
+          sym))))
 
     ;;; 6.6: Characters
 

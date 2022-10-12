@@ -234,7 +234,7 @@
   (assert (string? (symbol->string 'hello)))
   (assert (equal? (symbol->string 'hello) "hello")))
 
-(define-test "string->symbol" SKIP
+(define-test "string->symbol"
   (assert (symbol? (string->symbol "hello")))
   (assert (eq? (string->symbol "hello") 'hello)))
 

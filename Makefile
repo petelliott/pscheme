@@ -2,7 +2,8 @@ CC=gcc
 CFLAGS=-Wall -g -fno-omit-frame-pointer -I. -fPIE
 
 RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/rest.o runtime/apply.o \
-	         runtime/gdb_exts.o runtime/ports.o runtime/srfi-170.o runtime/main.o
+	         runtime/gdb_exts.o runtime/ports.o runtime/srfi-170.o \
+	         runtime/main.o runtime/symbol_table.o
 RUNTIME_TARGET=runtime/runtime.a
 
 pscheme1: $(RUNTIME_TARGET)

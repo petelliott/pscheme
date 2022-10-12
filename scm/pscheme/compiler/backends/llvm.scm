@@ -258,7 +258,10 @@
           (if (string? (car c))
               (f "c~a" (string->asm (car c)))
               (f "{~a}" (string-join ", " (map (lambda (d) (format "i64 ~a" (data-repr d))) c))))
-          (f ", align 16\n\n")))
+          (f ", align 16\n")
+          (when (eq? (cadr (name 'raw)) 'symbol)
+            (f "@~a_tbl = linkonce global i64 ~a, section \"symbols\"\n" n (data-repr (name 'raw))))
+          (f "\n")))
        ((define ,library-name ,symbol) (lib sym)
         (f "@~a = global i64 0~a\n\n"
            (mangle (lib 'raw) (sym 'raw)) (global-var-debug (sym 'raw) #f)))
