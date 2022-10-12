@@ -84,7 +84,7 @@
                  (dbg-define-local arg (caddr arg) (cadr arg)))
                (args 'raw))
           (when (rest 'raw)
-              (dbg-define-local (rest 'raw) (caddr (rest 'raw)) #f))
+              (dbg-define-local (rest 'raw) (caddr (rest 'raw)) (length (args 'raw))))
           (insts)
           (subprogram-metadata (dname 'raw) (dbg-lambda-name (dname 'raw)))))
        ((entry main ,@instruction) (insts)
