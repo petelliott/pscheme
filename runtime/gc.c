@@ -63,6 +63,7 @@ static void *try_allocate_cell(struct cell_region *region) {
     set_bit(region->allocated, i, 1);
 
     region->search_off = i + 1;
+    memset(&(region->cells[i]), 0, sizeof(struct pscheme_cons_cell));
     return &(region->cells[i]);
 }
 
@@ -156,6 +157,7 @@ static void *try_allocate_block(struct block_region *region, size_t len) {
         region->list = block;
     }
 
+    memset(block->data, 0, block->length);
     block->free = false;
     return block->data;
 }
@@ -335,7 +337,10 @@ static void calc_cells(struct cell_region *region, size_t *regions, size_t *tota
     calc_cells(region->next, regions, total, used);
 }
 
-static void calc_blocks(struct block_region *region, size_t *regions, size_t *total, size_t* objects, size_t *bytes) {
+static void calc_blocks(
+    struct block_region *region, size_t *regions, size_t *total,
+    size_t* objects, size_t* fobjects, size_t *bytes
+) {
     if (region == NULL)
         return;
 
@@ -345,18 +350,20 @@ static void calc_blocks(struct block_region *region, size_t *regions, size_t *to
         if (!b->free) {
             *objects += 1;
             *bytes += b->length;
+        } else {
+            *fobjects += 1;
         }
     }
 
-    calc_blocks(region->next, regions, total, objects, bytes);
+    calc_blocks(region->next, regions, total, objects, fobjects, bytes);
 }
 
 void pscheme_print_gc_stats(void) {
     size_t cell_regions = 0, total_cells = 0, used_cells = 0;
     calc_cells(cell_region, &cell_regions, &total_cells, &used_cells);
 
-    size_t block_regions = 0, total_block_bytes = 0, used_block_objects = 0, used_block_bytes = 0;
-    calc_blocks(block_region, &block_regions, &total_block_bytes, &used_block_objects, &used_block_bytes);
+    size_t block_regions = 0, total_block_bytes = 0, used_block_objects = 0, free_block_objects = 0, used_block_bytes = 0;
+    calc_blocks(block_region, &block_regions, &total_block_bytes, &used_block_objects, &free_block_objects, &used_block_bytes);
 
     fprintf(stderr, "--- GC STATS ---\n");
     fprintf(stderr, "cell regions:      %lu\n", cell_regions);
@@ -365,6 +372,7 @@ void pscheme_print_gc_stats(void) {
     fprintf(stderr, "block regions:     %lu\n", block_regions);
     fprintf(stderr, "total bytes:       %lu\n", total_block_bytes);
     fprintf(stderr, "allocated objects: %lu\n", used_block_objects);
+    fprintf(stderr, "free objects:      %lu\n", free_block_objects);
     fprintf(stderr, "allocated bytes:   %lu\n\n", used_block_bytes);
     fprintf(stderr, "collections:       %lu\n", garbage_collections);
     fprintf(stderr, "total bytes:       %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
