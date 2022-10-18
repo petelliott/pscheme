@@ -238,6 +238,29 @@
   (assert (symbol? (string->symbol "hello")))
   (assert (eq? (string->symbol "hello") 'hello)))
 
+;;; 6.7: Strings
+
+(define-test "string?"
+  (assert (string? "hello world")))
+
+(define-test "make-string"
+  (assert (string? (make-string 10)))
+  (assert (string? (make-string 10 #\a)))
+  (assert (equal? "aaa" (make-string 3 #\a))))
+
+(define-test "string"
+  (assert (string? (string #\a #\b #\c)))
+  (assert (equal? "abc" (string #\a #\b #\c))))
+
+(define-test "string-length"
+  (assert (equal? (string-length "123456") 6)))
+
+(define-test "string-ref"
+  (assert (equal? (string-ref "0123" 0) #\0))
+  (assert (equal? (string-ref "0123" 1) #\1))
+  (assert (equal? (string-ref "0123" 2) #\2))
+  (assert (equal? (string-ref "0123" 3) #\3)))
+
 ;;; 6.8: Vectors
 
 (define-test "vector?"
