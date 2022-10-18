@@ -3,5 +3,5 @@
 *.a
 *.pir
 *.ll
-pscheme1
-pscheme
+/pscheme1
+/pscheme

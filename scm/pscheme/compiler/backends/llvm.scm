@@ -229,11 +229,11 @@
       (toplevel-def
        ((lambda ,data-name (,@identifier) ,any ,@instruction) (dname args rest insts)
         (define meta (get-metadata (dname 'raw)))
-        (f "%~a_typ = type i64 (i64*, i64~a~a)\n"
+        (f "%~a_typ = type i64 (i64, i64~a~a)\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
            (if (rest 'raw) ", ..." ""))
-        (f "define private i64 @~a(i64* %closure, i64 %nargs~a~a) !dbg ~a {\n"
+        (f "define private i64 @~a(i64 %closure, i64 %nargs~a~a) !dbg ~a {\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64 ~a" a)) (strip-spans (args))))
            (if (rest 'raw) ", ..." "")
@@ -398,7 +398,10 @@
         (f "add i64 %tagged_closure_~a, ~a~a\n" u PSCM-T-CLOSURE (location)))
        ((closure-ref (closure ,number ,var-metadata)) (n v)
         (define u (unique))
-        (f "    %cref_~a = getelementptr i64, i64* %closure, i64 ~a~a\n" u (+ (n 'raw) 1) (location))
+        (f "    %cref_~a_a = lshr i64 %closure, 4~a\n" u (location))
+        (f "    %cref_~a_b = shl i64 %cref_~a_a, 4~a\n" u u (location))
+        (f "    %cref_~a_clos = inttoptr i64 %cref_~a_b to i64*~a\n" u u (location))
+        (f "    %cref_~a = getelementptr i64, i64* %cref_~a_clos, i64 ~a~a\n" u u (+ (n 'raw) 1) (location))
         (preop)
         (f "load i64, i64* %cref_~a~a\n" u (location)))
        ((global-ref ,identifier) (ident)
@@ -411,13 +414,14 @@
        ((call ,value ,@value) (fn args)
         (define u (unique))
         (define args2 (strip-spans (args)))
-        (f "    %call_~a_a = lshr i64 ~a, 4~a\n" u (strip-spans (fn)) (location))
+        (define fns (strip-spans (fn)))
+        (f "    %call_~a_a = lshr i64 ~a, 4~a\n" u fns (location))
         (f "    %call_~a_b = shl i64 %call_~a_a, 4~a\n" u u (location))
         (f "    %call_~a_clos = inttoptr i64 %call_~a_b to i64*~a\n" u u (location))
         (f "    %call_~a_fnint = load i64, i64* %call_~a_clos~a\n" u u (location))
-        (f "    %call_~a_fn = inttoptr i64 %call_~a_fnint to i64(i64*, i64, ...)*~a\n" u u (location))
+        (f "    %call_~a_fn = inttoptr i64 %call_~a_fnint to i64(i64, i64, ...)*~a\n" u u (location))
         (preop)
-        (f "call i64(i64*, i64, ...) %call_~a_fn(i64* %call_~a_clos, i64 ~a~a)~a\n" u u
+        (f "call i64(i64, i64, ...) %call_~a_fn(i64 ~a, i64 ~a~a)~a\n" u fns
            (length args2)
            (apply string-append (map (lambda (a) (format ", i64 ~a" a)) args2))
            (location)))
