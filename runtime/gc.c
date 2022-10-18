@@ -301,11 +301,21 @@ static size_t garbage_collections = 0;
 
 extern pscheme_t etext, edata, end;
 
+#define SCAN_REG(reg) {pscheme_t val; asm("movq %" reg ", %0" : "=r"(val)); scan_object(val);}
+
 void pscheme_collect_garbage(void) {
     pscheme_t stack_top;
 
     clear_allocated_bit(cell_region);
     free_all_blocks(block_region);
+
+    SCAN_REG("%rbx");
+    SCAN_REG("%rsp");
+    SCAN_REG("%rbp");
+    SCAN_REG("%r12");
+    SCAN_REG("%r13");
+    SCAN_REG("%r14");
+    SCAN_REG("%r15");
     scan_range(&etext, &end);
     scan_range(&stack_top, stack_bottom());
 
