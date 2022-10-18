@@ -226,6 +226,8 @@
       (syntax-rules (unquote unquote-splicing)
         ((_ (unquote form))
          form)
+        ((_ ((unquote-splicing form)))
+         form)
         ((_ ((unquote-splicing form) . rest))
          (append form (quasiquote rest)))
         ((_ (first . rest))
@@ -552,7 +554,7 @@
     (define (append2 a b)
       (if (null? a)
           b
-          (cons (car a) (append (cdr a) b))))
+          (cons (car a) (append2 (cdr a) b))))
 
     (define (append . lists)
       (cond
