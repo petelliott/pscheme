@@ -1112,7 +1112,7 @@
       (output-open output-port-open? set-output-port-open!))
 
     (define (call-with-port port proc)
-      (define ret (proc))
+      (define ret (proc port))
       (close-port port)
       ret)
 
