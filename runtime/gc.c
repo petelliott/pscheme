@@ -14,6 +14,8 @@
 #define CELL_REGION_OBJS (1024*1024)
 #endif
 
+static void print_block_metadata(void);
+
 struct cell_region {
     struct cell_region *next;
     size_t search_off;
@@ -382,6 +384,57 @@ static void calc_blocks(
     }
 
     calc_blocks(region->next, regions, total, objects, fobjects, bytes);
+}
+
+struct blockmeta {
+    int size;
+    int fcount;
+    int acount;
+};
+
+#define METADATA_LEN 1024
+
+static void record_metadata(struct blockmeta *meta, size_t *moff, size_t len, bool free) {
+    size_t i = 0;
+    for (; i < *moff; ++i) {
+        if (meta[i].size == len)
+            break;
+    }
+    assert(i < METADATA_LEN);
+    if (i == *moff) {
+        ++*moff;
+        meta[i].size = len;
+        meta[i].fcount = 0;
+        meta[i].acount = 0;
+    }
+
+    if (free) {
+        meta[i].fcount++;
+    } else {
+        meta[i].acount++;
+    }
+}
+
+static void scan_metadata(struct block_region *region, struct blockmeta *meta, size_t *moff) {
+    if (region == NULL)
+        return;
+
+    for (struct block *b = region->list; b != NULL; b = b->next) {
+        record_metadata(meta, moff, b->length, b->free);
+    }
+
+    scan_metadata(region->next, meta, moff);
+}
+
+static void print_block_metadata(void) {
+    struct blockmeta metadata[1024];
+    size_t moff = 0;
+    scan_metadata(block_region, metadata, &moff);
+
+    fprintf(stderr, "--- BLOCK ALLOCATOR STATS ---\n");
+    for (size_t i = 0; i < moff; ++i) {
+        fprintf(stderr, "%d\t%d/%d\n", metadata[i].size, metadata[i].fcount, metadata[i].acount);
+    }
 }
 
 void pscheme_print_gc_stats(void) {
