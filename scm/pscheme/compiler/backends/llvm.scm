@@ -131,7 +131,7 @@
         ((_ name values ...)
          (begin
            (define cnt -1)
-           (define values (begin (set! cnt (+ cnt 1)))) ...))))
+           (define values (begin (set! cnt (+ cnt 1)) cnt)) ...))))
 
     (enum tags
           PSCM-T-FIXNUM
