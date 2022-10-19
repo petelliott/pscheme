@@ -114,6 +114,7 @@ struct block {
 struct block_region {
     struct block_region *next;
     struct block *list;
+    struct block *free_cursor;
     size_t uninit_off;
     char data[BLOCK_REGION_BYTES] __attribute__((aligned (16)));
 };
@@ -136,7 +137,8 @@ static struct block *try_allocate_free_block(struct block_region *region, size_t
         return NULL;
     }
 
-    struct block *block = try_allocate_block_freelist(region->list, len);
+    struct block *block = try_allocate_block_freelist(region->free_cursor, len);
+    region->free_cursor = block;
     if (block != NULL) {
         return block;
     }
@@ -187,6 +189,7 @@ static struct block_region *make_block_region(struct block_region *next) {
     struct block_region *region = malloc(sizeof(struct block_region));
     region->next = next;
     region->list = NULL;
+    region->free_cursor = NULL;
     region->uninit_off = 0;
 
     return region;
@@ -288,6 +291,7 @@ static void clear_allocated_bit(struct cell_region *region) {
 
 static void free_all_blocks(struct block_region *region) {
     for (struct block_region *r = region; r != NULL; r = r->next) {
+        r->free_cursor = r->list;
         for (struct block *b = r->list; b != NULL; b = b->next) {
             b->free = true;
         }
