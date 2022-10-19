@@ -158,12 +158,13 @@ static struct block *try_allocate_fresh_block(struct block_region *region, size_
     }
 
     struct block *block = (void *)(region->data + region->uninit_off);
-    block->length = len;
-    region->uninit_off += sizeof(struct block) + len;
+    size_t data_start = region->uninit_off + sizeof(struct block);
+    region->uninit_off = data_start + len;
     if (region->uninit_off % 16 != 0) {
         // properly re-align.
         region->uninit_off += (16 - (region->uninit_off % 16));
     }
+    block->length = region->uninit_off - data_start;
 
     block->next = region->list;
     region->list = block;
