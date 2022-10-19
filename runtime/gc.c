@@ -131,30 +131,51 @@ static struct block *try_allocate_block_freelist(struct block *block, size_t len
     return try_allocate_block_freelist(block->next, len);
 }
 
-static void *try_allocate_block(struct block_region *region, size_t len) {
+static struct block *try_allocate_free_block(struct block_region *region, size_t len) {
     if (region == NULL) {
         return NULL;
     }
 
     struct block *block = try_allocate_block_freelist(region->list, len);
+    if (block != NULL) {
+        return block;
+    }
 
+    return try_allocate_free_block(region->next, len);
+}
+
+static struct block *try_allocate_fresh_block(struct block_region *region, size_t len) {
+    if (region == NULL) {
+        return NULL;
+    }
+
+    if (BLOCK_REGION_BYTES < region->uninit_off + sizeof(struct block) ||
+        len > BLOCK_REGION_BYTES - region->uninit_off - sizeof(struct block)) {
+
+        return try_allocate_fresh_block(region->next, len);
+    }
+
+    struct block *block = (void *)(region->data + region->uninit_off);
+    block->length = len;
+    region->uninit_off += sizeof(struct block) + len;
+    if (region->uninit_off % 16 != 0) {
+        // properly re-align.
+        region->uninit_off += (16 - (region->uninit_off % 16));
+    }
+
+    block->next = region->list;
+    region->list = block;
+
+    return block;
+}
+
+static void *try_allocate_block(struct block_region *region, size_t len) {
+    struct block *block = try_allocate_free_block(region, len);
     if (block == NULL) {
-        if (BLOCK_REGION_BYTES < region->uninit_off + sizeof(struct block) ||
-            len > BLOCK_REGION_BYTES - region->uninit_off - sizeof(struct block)) {
-
-            return try_allocate_block(region->next, len);
+        block = try_allocate_fresh_block(region, len);
+        if (block == NULL) {
+            return NULL;
         }
-
-        block = (void *)(region->data + region->uninit_off);
-        block->length = len;
-        region->uninit_off += sizeof(struct block) + len;
-        if (region->uninit_off % 16 != 0) {
-            // properly re-align.
-            region->uninit_off += (16 - (region->uninit_off % 16));
-        }
-
-        block->next = region->list;
-        region->list = block;
     }
 
     memset(block->data, 0, block->length);
