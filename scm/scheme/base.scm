@@ -444,6 +444,12 @@
           1
           (* z1 (expt z1 (- z2 1)))))
 
+    (define (digit->char dig)
+      (integer->char
+       (if (> dig 10)
+           (+ (char->integer #\a) (- dig 10))
+           (+ (char->integer #\0) dig))))
+
     (define (number->string z . args)
       (options args (radix 10))
       (define port (open-output-string))
@@ -456,7 +462,7 @@
               (loop (- n)))
              ((not (zero? n))
               (loop (quotient n radix))
-              (write-char (integer->char (+ (char->integer #\0) (remainder n radix))) port)))))
+              (write-char (digit->char (remainder n radix)) port)))))
       (get-output-string port))
 
     (define (hex-digit-value ch)
