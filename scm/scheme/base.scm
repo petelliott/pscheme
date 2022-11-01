@@ -485,11 +485,18 @@
        (else
         (string->number-inner string (+ i 1) l (+ (* n r) chn) r))))
 
+    (define (maybe- a)
+      (and a (- a)))
+
     (define (string->number string . args)
       (options args (radix 10))
-      (if (char=? (string-ref string 0) #\-)
-          (- (string->number-inner string 1 (string-length string) 0 radix))
-          (string->number-inner string 0 (string-length string) 0 radix)))
+      (cond
+       ((equal? string "") #f)
+       ((equal? string "-") #f)
+       ((char=? (string-ref string 0) #\-)
+        (maybe- (string->number-inner string 1 (string-length string) 0 radix)))
+       (else
+        (string->number-inner string 0 (string-length string) 0 radix))))
 
     ;;; 6.3: Booleans
 
