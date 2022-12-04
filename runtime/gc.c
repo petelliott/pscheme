@@ -14,6 +14,22 @@
 #define CELL_REGION_OBJS (1024*1024)
 #endif
 
+
+static bool autocollect = true;
+void pscheme_set_automatic_collection(bool enabled) {
+    autocollect = enabled;
+}
+
+bool pscheme_is_automatic_collection_enabled(void) {
+    return autocollect;
+}
+
+static void do_automatic_collection(void) {
+    if (autocollect) {
+        pscheme_collect_garbage();
+    }
+}
+
 static void print_block_metadata(void);
 
 struct cell_region {
@@ -88,7 +104,7 @@ void *pscheme_allocate_cell(void) {
         if (ptr != NULL)
             return ptr;
 
-        pscheme_collect_garbage();
+        do_automatic_collection();
         ptr = try_allocate_cell(cell_region);
         if (ptr != NULL)
             return ptr;
@@ -211,7 +227,7 @@ void *pscheme_allocate_block(size_t len) {
         if (ptr != NULL)
             return ptr;
 
-        pscheme_collect_garbage();
+        do_automatic_collection();
         ptr = try_allocate_block(block_region, len);
         if (ptr != NULL)
             return ptr;
