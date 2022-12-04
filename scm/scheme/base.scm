@@ -1192,11 +1192,13 @@
 
     (define (read-line . rest)
       (options rest (port (current-input-port)))
-      (do ((sb (make-string-builder))
-           (ch (read-char port) (read-char port)))
-          ((or (eof-object? ch) (char=? ch #\newline))
-           (string-builder-build sb))
-        (string-builder-append sb ch)))
+      (if (eof-object? (peek-char port))
+          (peek-char port)
+          (do ((sb (make-string-builder))
+               (ch (read-char port) (read-char port)))
+              ((or (eof-object? ch) (char=? ch #\newline))
+               (string-builder-build sb))
+            (string-builder-append sb ch))))
 
     (define (read-u8 . rest)
       (options rest (port (current-input-port)))
