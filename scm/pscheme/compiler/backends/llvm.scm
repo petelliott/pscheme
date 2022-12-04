@@ -226,7 +226,7 @@
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64")) (strip-spans (args))))
            (if (rest 'raw) ", ..." ""))
-        (f "define private i64 @~a(i64 %closure, i64 %nargs~a~a) !dbg ~a {\n"
+        (f "define internal i64 @~a(i64 %closure, i64 %nargs~a~a) !dbg ~a {\n"
            (data-name (dname 'raw))
            (apply string-append (map (lambda (a) (format ", i64 ~a" a)) (strip-spans (args))))
            (if (rest 'raw) ", ..." "")
