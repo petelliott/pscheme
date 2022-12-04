@@ -152,15 +152,8 @@
           PSCM-S-UNSPECIFIED
           PSCM-S-UNBOUND)
 
-    (define max-fixnum (expt 2 60))
-    (define (numeric-representation n)
-      (* (modulo n max-fixnum) 16))
-
-    (define (tag-pointer ptr tag)
-      (+ ptr tag))
-
     (define (tag-number num tag)
-      (+ (numeric-representation num) tag))
+      (format "or (i64 shl (i64 ~a, i64 4), i64 ~a)" num tag))
 
     (define (data-name value)
       (match value
