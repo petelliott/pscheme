@@ -1,6 +1,7 @@
 #include "gc.h"
-#include <stdlib.h>
+#include "rangetable.h"
 #include "object.h"
+#include <stdlib.h>
 #include <limits.h>
 #include <assert.h>
 #include <stdio.h>
@@ -96,6 +97,7 @@ static struct cell_region *make_cell_region(struct cell_region *next) {
 }
 
 static struct cell_region *cell_region = NULL;
+static struct rangetable cell_region_table = NEW_RANGETABLE;
 
 void *pscheme_allocate_cell(void) {
     void *ptr;
@@ -111,6 +113,7 @@ void *pscheme_allocate_cell(void) {
     }
 
     cell_region = make_cell_region(cell_region);
+    rt_insert(&cell_region_table, (size_t) cell_region->cells, (size_t) (cell_region->cells + CELL_REGION_OBJS), cell_region);
     ptr = try_allocate_cell(cell_region);
     assert(ptr != NULL);
     return ptr;
@@ -215,6 +218,7 @@ static struct block_region *make_block_region(struct block_region *next) {
 }
 
 static struct block_region *block_region = NULL;
+static struct rangetable block_region_table = NEW_RANGETABLE;
 
 void *pscheme_allocate_block(size_t len) {
     if (len <= sizeof(struct pscheme_cons_cell)) {
@@ -234,31 +238,18 @@ void *pscheme_allocate_block(size_t len) {
     }
 
     block_region = make_block_region(block_region);
+    rt_insert(&block_region_table, (size_t) block_region->data, (size_t) (block_region->data + BLOCK_REGION_BYTES), block_region);
     ptr = try_allocate_block(block_region, len);
     assert(ptr != NULL);
     return ptr;
 }
 
 static struct cell_region *find_cell_region(struct cell_region *region, struct pscheme_cons_cell *ptr) {
-    // find the region the cell is in.
-    struct cell_region *r = region;
-    for (; r != NULL; r = r->next) {
-        if (ptr >= r->cells && ptr < r->cells + CELL_REGION_OBJS) {
-            break;
-        }
-    }
-    return r;
+    return rt_find(&cell_region_table, (size_t) ptr);
 }
 
 static struct block_region *find_block_region(struct block_region *region, void *ptr) {
-    char *cptr = ptr;
-    struct block_region *r = region;
-    for (; r != NULL; r = r->next) {
-        if (cptr >= r->data && cptr < r->data + BLOCK_REGION_BYTES) {
-            break;
-        }
-    }
-    return r;
+    return rt_find(&block_region_table, (size_t) ptr);
 }
 
 static void scan_object(pscheme_t obj) {
