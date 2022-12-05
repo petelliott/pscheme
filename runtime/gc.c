@@ -125,7 +125,10 @@ void *pscheme_allocate_cell(void) {
 #define BLOCK_REGION_BYTES (1024*1024)
 #endif
 
+#define CANARY_VALUE 0x1ab691a42e3a2c1f
+
 struct block {
+    size_t canary;
     struct block *next;
     uint32_t length;
     bool free;
@@ -160,11 +163,14 @@ static struct block *try_allocate_free_block(struct block_region *region, size_t
 
     struct block *block = try_allocate_block_freelist(region->free_cursor, len);
     region->free_cursor = block;
-    if (block != NULL) {
-        return block;
+    if (block == NULL) {
+        block = try_allocate_free_block(region->next, len);
+        if (block == NULL)
+            return block;
     }
 
-    return try_allocate_free_block(region->next, len);
+    memset(block->data, 0, block->length);
+    return block;
 }
 
 static struct block *try_allocate_fresh_block(struct block_region *region, size_t len) {
@@ -179,6 +185,7 @@ static struct block *try_allocate_fresh_block(struct block_region *region, size_
     }
 
     struct block *block = (void *)(region->data + region->uninit_off);
+    block->canary = CANARY_VALUE;
     size_t data_start = region->uninit_off + sizeof(struct block);
     region->uninit_off = data_start + len;
     if (region->uninit_off % 16 != 0) {
@@ -444,6 +451,18 @@ static void print_block_metadata(void) {
     }
 }
 
+static void check_canaries(struct block_region *region) {
+    if (region == NULL) return;
+
+    for (struct block *b = region->list; b != NULL; b = b->next) {
+        if (b->canary != CANARY_VALUE) {
+            fprintf(stderr, "corrupted block: %p\n", b);
+        }
+    }
+
+    check_canaries(region->next);
+}
+
 void pscheme_print_gc_stats(void) {
     size_t cell_regions = 0, total_cells = 0, used_cells = 0;
     calc_cells(cell_region, &cell_regions, &total_cells, &used_cells);
@@ -461,5 +480,8 @@ void pscheme_print_gc_stats(void) {
     fprintf(stderr, "free objects:      %lu\n", free_block_objects);
     fprintf(stderr, "allocated bytes:   %lu\n\n", used_block_bytes);
     fprintf(stderr, "collections:       %lu\n", garbage_collections);
-    fprintf(stderr, "total bytes:       %lu\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
+    fprintf(stderr, "total bytes:       %lu\n\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
+
+    // canary checks
+    check_canaries(block_region);
 }
