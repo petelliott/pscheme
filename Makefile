@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -g -fno-omit-frame-pointer -I. -fPIE
+CFLAGS=-Wall -g -I. -fPIE -O2
 
 RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/rest.o runtime/apply.o \
 	         runtime/gdb_exts.o runtime/ports.o runtime/srfi-170.o \

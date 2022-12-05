@@ -310,8 +310,8 @@ static void free_all_blocks(struct block_region *region) {
 
 #define ALIGN(ptr, pwr) ((typeof(ptr))((((uintptr_t)(ptr)) >> (pwr)) << (pwr)))
 
-static void scan_range(pscheme_t *start, pscheme_t *end) {
-    for (pscheme_t *i = ALIGN(start, 3); i < end; ++i) {
+static void scan_range(void *start, void *end) {
+    for (pscheme_t *i = ALIGN(start, 3); (void *)i < end; ++i) {
         scan_object(*i);
     }
 }
@@ -336,7 +336,7 @@ static pscheme_t *stack_bottom(void) {
 
 static size_t garbage_collections = 0;
 
-extern pscheme_t etext, edata, end;
+extern char etext, edata, end;
 
 #define SCAN_REG(reg) {pscheme_t val; asm("movq %" reg ", %0" : "=r"(val)); scan_object(val);}
 
