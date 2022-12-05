@@ -446,7 +446,7 @@
 
     (define (digit->char dig)
       (integer->char
-       (if (> dig 10)
+       (if (>= dig 10)
            (+ (char->integer #\a) (- dig 10))
            (+ (char->integer #\0) dig))))
 
