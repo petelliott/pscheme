@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
     command_line = PSCM_NIL;
 
     for (int i = argc - 1; i >= 0; --i) {
-        char *arg_copy = pscheme_allocate_block(strlen(argv[i]));
+        char *arg_copy = pscheme_allocate_block(strlen(argv[i]) + 1);
         strcpy(arg_copy, argv[i]);
         command_line = pscheme_cons(((pscheme_t)arg_copy) | PSCM_T_STRING, command_line);
     }
