@@ -283,6 +283,12 @@ static void scan_object(pscheme_t obj) {
         pscheme_t *slots = p;
 
         struct block *block = (void *)(((char *)p) - sizeof(struct block));
+
+        if (block->canary != CANARY_VALUE) {
+            fprintf(stderr, "almost corrupted the heap. let me know if you hit this.\n");
+            return;
+        }
+
         if (block->free) {
             block->free = false;
 

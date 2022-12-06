@@ -217,6 +217,11 @@
     (define (ret-unspec)
       (f "add i64 ~a, 0~a\n" (tag-number PSCM-S-UNSPECIFIED PSCM-T-SINGLETON) (location)))
 
+    (define (pin-closure)
+      (define u (unique))
+      (f "    %closptr_~a = alloca i64\n" u)
+      (f "    store volatile i64 %closure, i64* %closptr_~a\n" u))
+
 
     (define-pass llvm-codegen (ssa-ir)
       (toplevel-def
@@ -238,6 +243,7 @@
                (args 'raw))
           (when (rest 'raw)
               (dbg-change-value (rest 'raw) (caddr (rest 'raw)) "%restarg")) ;; TODO: idk why i have to use restarg
+          (pin-closure)
           (insts))
         (f "}\n\n"))
        ((data ,data-name ,@any) (name contents)
