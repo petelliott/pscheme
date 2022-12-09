@@ -260,9 +260,6 @@ static struct block_region *find_block_region(struct block_region *region, void 
 }
 
 static void scan_object(pscheme_t obj) {
-    if (!is_ptr_obj(obj)) {
-        return;
-    }
 
     void *p = ptr(obj);
     struct cell_region *cr;
@@ -280,9 +277,15 @@ static void scan_object(pscheme_t obj) {
             }
         }
     } else if ((br = find_block_region(block_region, p)) != NULL) {
-        pscheme_t *slots = p;
+        // TODO: this is probably hella slow
+        struct block *block;
+        for (block = br->list; block != NULL; block = block->next) {
+            if (p >= (void *) block->data && p < (void *)(block->data + block->length)) {
+                break;
+            }
+        }
 
-        struct block *block = (void *)(((char *)p) - sizeof(struct block));
+        pscheme_t *slots = (void *)block->data;
 
         if (block->canary != CANARY_VALUE) {
             fprintf(stderr, "almost corrupted the heap. let me know if you hit this.\n");
