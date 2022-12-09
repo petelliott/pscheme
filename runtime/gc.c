@@ -263,7 +263,6 @@ static struct block_region *find_block_region(struct block_region *region, void 
 }
 
 static void scan_object(pscheme_t obj) {
-
     void *p = ptr(obj);
     struct cell_region *cr;
     struct block_region *br;

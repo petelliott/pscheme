@@ -28,8 +28,16 @@ void rt_insert(struct rangetable *table, size_t start, size_t end, void *ptr) {
     table->entries[table->len] = (struct range){ .start = start, .end = end, .ptr = ptr };
     table->len++;
 
-    // TODO: this would be faster as an insertion.
-    qsort(table->entries, table->len, sizeof(struct range), compare);
+    // TODO: could be optimized further to a single memmove.
+    for (size_t i = table->len - 1; i > 0; --i) {
+        // extremley fast for most likely case, where each insertion is after the last
+        if (table->entries[i].start >= table->entries[i-1].end)
+            break;
+
+        struct range tmp = table->entries[i];
+        table->entries[i] = table->entries[i-1];
+        table->entries[i-1] = tmp;
+    }
 }
 
 void *rt_find(struct rangetable *table, size_t point) {
