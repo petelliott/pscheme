@@ -138,6 +138,7 @@ struct block {
 struct block_region {
     struct block_region *next;
     struct block *list;
+    struct rangetable block_table;
     struct block *free_cursor;
     size_t uninit_off;
     char data[BLOCK_REGION_BYTES] __attribute__((aligned (16)));
@@ -196,6 +197,7 @@ static struct block *try_allocate_fresh_block(struct block_region *region, size_
 
     block->next = region->list;
     region->list = block;
+    rt_insert(&region->block_table, (size_t) block->data, (size_t)(block->data + block->length), block);
 
     return block;
 }
@@ -218,6 +220,7 @@ static struct block_region *make_block_region(struct block_region *next) {
     struct block_region *region = malloc(sizeof(struct block_region));
     region->next = next;
     region->list = NULL;
+    region->block_table = NEW_RANGETABLE;
     region->free_cursor = NULL;
     region->uninit_off = 0;
 
@@ -277,20 +280,12 @@ static void scan_object(pscheme_t obj) {
             }
         }
     } else if ((br = find_block_region(block_region, p)) != NULL) {
-        // TODO: this is probably hella slow
-        struct block *block;
-        for (block = br->list; block != NULL; block = block->next) {
-            if (p >= (void *) block->data && p < (void *)(block->data + block->length)) {
-                break;
-            }
-        }
+        struct block *block = rt_find(&br->block_table, (size_t)p);
+        if (block == NULL)
+            return;
+        assert(block->canary == CANARY_VALUE);
 
         pscheme_t *slots = (void *)block->data;
-
-        if (block->canary != CANARY_VALUE) {
-            fprintf(stderr, "almost corrupted the heap. let me know if you hit this.\n");
-            return;
-        }
 
         if (block->free) {
             block->free = false;
