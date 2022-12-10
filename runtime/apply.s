@@ -11,6 +11,7 @@ pscheme_internal_apply:
     mov %rdi, %rax
     shr $4, %rax
     shl $4, %rax
+    mov %rax, %rdi
     mov (%rax), %rax
     push %rax      /* fn */
     mov %rdx, %r11 /* args */
