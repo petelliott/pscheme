@@ -57,11 +57,7 @@ static size_t first_free(const size_t *array, size_t start, size_t len) {
     for (size_t i = start_block; i < len/(sizeof(size_t) * CHAR_BIT); ++i) {
         size_t block = array[i];
         if (block != 0xfffffffffffffffflu) {
-            for (size_t j = 0; j < sizeof(size_t) * CHAR_BIT; ++j) {
-                if (!(block & (1lu << j))) {
-                    return i*sizeof(size_t)*CHAR_BIT + j;
-                }
-            }
+            return i*sizeof(size_t)*CHAR_BIT + __builtin_ctzl(~block);
         }
     }
     return len;
