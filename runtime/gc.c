@@ -12,7 +12,7 @@
 #if MINI_REGIONS
 #define REGION_BYTES 1024
 #else
-#define REGION_BYTES (1024*1024)
+#define REGION_BYTES (1024*1024*64)
 #endif
 
 static bool autocollect = true;
