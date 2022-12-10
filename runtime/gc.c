@@ -10,11 +10,10 @@
 #define MINI_REGIONS 0
 
 #if MINI_REGIONS
-#define CELL_REGION_OBJS 64
+#define REGION_BYTES 1024
 #else
-#define CELL_REGION_OBJS (1024*1024)
+#define REGION_BYTES (1024*1024)
 #endif
-
 
 static bool autocollect = true;
 void pscheme_set_automatic_collection(bool enabled) {
@@ -31,13 +30,12 @@ static void do_automatic_collection(void) {
     }
 }
 
-static void print_block_metadata(void);
-
-struct cell_region {
-    struct cell_region *next;
+struct slab_region {
+    struct slab_region *next;
     size_t search_off;
-    size_t allocated[CELL_REGION_OBJS/(sizeof(size_t)*CHAR_BIT)];
-    struct pscheme_cons_cell cells[CELL_REGION_OBJS];
+    size_t size;
+    size_t allocated[(REGION_BYTES/16)/(sizeof(size_t)*CHAR_BIT)];
+    char data[REGION_BYTES] __attribute__((aligned (16)));
 };
 
 static bool get_bit(size_t *array, size_t i) {
@@ -69,61 +67,73 @@ static size_t first_free(const size_t *array, size_t start, size_t len) {
     return len;
 }
 
-static void *try_allocate_cell(struct cell_region *region) {
+static void *try_allocate_slab(struct slab_region *region) {
     if (region == NULL) {
         return NULL;
     }
 
-    size_t i = first_free(region->allocated, region->search_off, CELL_REGION_OBJS);
-    if (i == CELL_REGION_OBJS) {
-        return try_allocate_cell(region->next);
+    size_t i = first_free(region->allocated, region->search_off, REGION_BYTES / region->size);
+    if (i == (REGION_BYTES/region->size)) {
+        return try_allocate_slab(region->next);
     }
 
     set_bit(region->allocated, i, 1);
 
     region->search_off = i + 1;
-    memset(&(region->cells[i]), 0, sizeof(struct pscheme_cons_cell));
-    return &(region->cells[i]);
+    void *slab = region->data + (i * region->size);
+    memset(slab, 0, region->size);
+    return slab;
 }
 
-static struct cell_region *make_cell_region(struct cell_region *next) {
-    struct cell_region *region = malloc(sizeof(struct cell_region));
+static struct slab_region *make_slab_region(struct slab_region *next, size_t size) {
+    assert(next == NULL || next->size == size);
+
+    struct slab_region *region = malloc(sizeof(struct slab_region));
     region->next = next;
     region->search_off = 0;
+    region->size = size;
 
     memset(region->allocated, 0, sizeof(region->allocated));
 
     return region;
 }
 
-static struct cell_region *cell_region = NULL;
-static struct rangetable cell_region_table = NEW_RANGETABLE;
+#define N_SLAB_ALLOCATORS 3
 
-void *pscheme_allocate_cell(void) {
+static struct slab_region *slab_regions[N_SLAB_ALLOCATORS] = {0};
+static struct rangetable slab_region_table = NEW_RANGETABLE;
+
+static void *allocate_slab(size_t size) {
+    size_t slabi = __builtin_ctz(size) - 4;
+    assert(slabi < N_SLAB_ALLOCATORS);
+    assert(slab_regions[slabi] == NULL || slab_regions[slabi]->size == size);
+
     void *ptr;
-    if (cell_region != NULL) {
-        ptr = try_allocate_cell(cell_region);
+    if (slab_regions[slabi] != NULL) {
+        ptr = try_allocate_slab(slab_regions[slabi]);
         if (ptr != NULL)
             return ptr;
 
         do_automatic_collection();
-        ptr = try_allocate_cell(cell_region);
+        ptr = try_allocate_slab(slab_regions[slabi]);
         if (ptr != NULL)
             return ptr;
     }
 
-    cell_region = make_cell_region(cell_region);
-    rt_insert(&cell_region_table, (size_t) cell_region->cells, (size_t) (cell_region->cells + CELL_REGION_OBJS), cell_region);
-    ptr = try_allocate_cell(cell_region);
+    slab_regions[slabi] = make_slab_region(slab_regions[slabi], size);
+    rt_insert(&slab_region_table,
+              (size_t) slab_regions[slabi]->data,
+              (size_t) (slab_regions[slabi]->data + REGION_BYTES),
+              slab_regions[slabi]);
+
+    ptr = try_allocate_slab(slab_regions[slabi]);
     assert(ptr != NULL);
     return ptr;
 }
 
-#if MINI_REGIONS
-#define BLOCK_REGION_BYTES 1024
-#else
-#define BLOCK_REGION_BYTES (1024*1024)
-#endif
+void *pscheme_allocate_cell(void) {
+    return allocate_slab(sizeof(struct pscheme_cons_cell));
+}
 
 #define CANARY_VALUE 0x1ab691a42e3a2c1f
 
@@ -141,7 +151,7 @@ struct block_region {
     struct rangetable block_table;
     struct block *free_cursor;
     size_t uninit_off;
-    char data[BLOCK_REGION_BYTES] __attribute__((aligned (16)));
+    char data[REGION_BYTES] __attribute__((aligned (16)));
 };
 
 static struct block *try_allocate_block_freelist(struct block *block, size_t len) {
@@ -179,8 +189,8 @@ static struct block *try_allocate_fresh_block(struct block_region *region, size_
         return NULL;
     }
 
-    if (BLOCK_REGION_BYTES < region->uninit_off + sizeof(struct block) ||
-        len > BLOCK_REGION_BYTES - region->uninit_off - sizeof(struct block)) {
+    if (REGION_BYTES < region->uninit_off + sizeof(struct block) ||
+        len > REGION_BYTES - region->uninit_off - sizeof(struct block)) {
 
         return try_allocate_fresh_block(region->next, len);
     }
@@ -231,6 +241,12 @@ static struct block_region *block_region = NULL;
 static struct rangetable block_region_table = NEW_RANGETABLE;
 
 void *pscheme_allocate_block(size_t len) {
+    for (size_t i = 0; i < N_SLAB_ALLOCATORS; ++i) {
+        size_t slab_size = 1 << (i+4);
+        if (len < slab_size)
+            return allocate_slab(slab_size);
+    }
+
     if (len <= sizeof(struct pscheme_cons_cell)) {
         return pscheme_allocate_cell();
     }
@@ -248,37 +264,37 @@ void *pscheme_allocate_block(size_t len) {
     }
 
     block_region = make_block_region(block_region);
-    rt_insert(&block_region_table, (size_t) block_region->data, (size_t) (block_region->data + BLOCK_REGION_BYTES), block_region);
+    rt_insert(&block_region_table, (size_t) block_region->data, (size_t) (block_region->data + REGION_BYTES), block_region);
     ptr = try_allocate_block(block_region, len);
     assert(ptr != NULL);
     return ptr;
 }
 
-static struct cell_region *find_cell_region(struct cell_region *region, struct pscheme_cons_cell *ptr) {
-    return rt_find(&cell_region_table, (size_t) ptr);
+static struct slab_region *find_slab_region(struct pscheme_cons_cell *ptr) {
+    return rt_find(&slab_region_table, (size_t) ptr);
 }
 
-static struct block_region *find_block_region(struct block_region *region, void *ptr) {
+static struct block_region *find_block_region(void *ptr) {
     return rt_find(&block_region_table, (size_t) ptr);
 }
 
 static void scan_object(pscheme_t obj) {
     void *p = ptr(obj);
-    struct cell_region *cr;
+    struct slab_region *sr;
     struct block_region *br;
 
-    if ((cr = find_cell_region(cell_region, p)) != NULL) {
-        struct pscheme_cons_cell *cell = p;
-        if (!get_bit(cr->allocated, cell - cr->cells)) {
+    if ((sr = find_slab_region(p)) != NULL) {
+        size_t slabi = ((char*)p - sr->data) / sr->size;
+        if (!get_bit(sr->allocated, slabi)) {
             // mark the cell as allocated.
-            set_bit(cr->allocated, cell - cr->cells, true);
+            set_bit(sr->allocated, slabi, true);
 
-            if (!is_leaf_obj(obj)) {
-                scan_object(cell->car);
-                scan_object(cell->cdr);
+            pscheme_t *slab = (void *)(sr->data + (slabi * sr->size));
+            for (size_t i = 0; i < sr->size / sizeof(pscheme_t); ++i) {
+                scan_object(slab[i]);
             }
         }
-    } else if ((br = find_block_region(block_region, p)) != NULL) {
+    } else if ((br = find_block_region(p)) != NULL) {
         struct block *block = rt_find(&br->block_table, (size_t)p);
         if (block == NULL)
             return;
@@ -298,7 +314,7 @@ static void scan_object(pscheme_t obj) {
     }
 }
 
-static void clear_allocated_bit(struct cell_region *region) {
+static void clear_allocated_bit(struct slab_region *region) {
     if (region == NULL) {
         return;
     }
@@ -353,7 +369,9 @@ extern char etext, edata, end;
 void pscheme_collect_garbage(void) {
     pscheme_t stack_top;
 
-    clear_allocated_bit(cell_region);
+    for (size_t i = 0; i < N_SLAB_ALLOCATORS; ++i) {
+        clear_allocated_bit(slab_regions[i]);
+    }
     free_all_blocks(block_region);
 
     SCAN_REG("%rbx");
@@ -369,17 +387,17 @@ void pscheme_collect_garbage(void) {
     ++garbage_collections;
 }
 
-static void calc_cells(struct cell_region *region, size_t *regions, size_t *total, size_t *used) {
+static void calc_slabs(struct slab_region *region, size_t *regions, size_t *total, size_t *used) {
     if (region == NULL)
         return;
 
     *regions += 1;
-    *total += CELL_REGION_OBJS;
+    *total += REGION_BYTES / region->size;
     for (size_t i = 0; i < sizeof(region->allocated)/sizeof(size_t); ++i) {
         *used += __builtin_popcountl(region->allocated[i]);
     }
 
-    calc_cells(region->next, regions, total, used);
+    calc_slabs(region->next, regions, total, used);
 }
 
 static void calc_blocks(
@@ -390,7 +408,7 @@ static void calc_blocks(
         return;
 
     *regions += 1;
-    *total += BLOCK_REGION_BYTES;
+    *total += REGION_BYTES;
     for (struct block *b = region->list; b != NULL; b = b->next) {
         if (!b->free) {
             *objects += 1;
@@ -409,51 +427,6 @@ struct blockmeta {
     int acount;
 };
 
-#define METADATA_LEN 1024
-
-static void record_metadata(struct blockmeta *meta, size_t *moff, size_t len, bool free) {
-    size_t i = 0;
-    for (; i < *moff; ++i) {
-        if (meta[i].size == len)
-            break;
-    }
-    assert(i < METADATA_LEN);
-    if (i == *moff) {
-        ++*moff;
-        meta[i].size = len;
-        meta[i].fcount = 0;
-        meta[i].acount = 0;
-    }
-
-    if (free) {
-        meta[i].fcount++;
-    } else {
-        meta[i].acount++;
-    }
-}
-
-static void scan_metadata(struct block_region *region, struct blockmeta *meta, size_t *moff) {
-    if (region == NULL)
-        return;
-
-    for (struct block *b = region->list; b != NULL; b = b->next) {
-        record_metadata(meta, moff, b->length, b->free);
-    }
-
-    scan_metadata(region->next, meta, moff);
-}
-
-static void print_block_metadata(void) {
-    struct blockmeta metadata[1024];
-    size_t moff = 0;
-    scan_metadata(block_region, metadata, &moff);
-
-    fprintf(stderr, "--- BLOCK ALLOCATOR STATS ---\n");
-    for (size_t i = 0; i < moff; ++i) {
-        fprintf(stderr, "%d\t%d/%d\n", metadata[i].size, metadata[i].fcount, metadata[i].acount);
-    }
-}
-
 static void check_canaries(struct block_region *region) {
     if (region == NULL) return;
 
@@ -467,23 +440,37 @@ static void check_canaries(struct block_region *region) {
 }
 
 void pscheme_print_gc_stats(void) {
-    size_t cell_regions = 0, total_cells = 0, used_cells = 0;
-    calc_cells(cell_region, &cell_regions, &total_cells, &used_cells);
+    fprintf(stderr, "--- GC STATS ---\n");
+
+    size_t total_bytes = 0;
+    size_t used_bytes = 0;
+
+    for (size_t i = 0; i < N_SLAB_ALLOCATORS; ++i) {
+        size_t nslab_regions = 0, total_slabs = 0, used_slabs = 0;
+        calc_slabs(slab_regions[i], &nslab_regions, &total_slabs, &used_slabs);
+
+        fprintf(stderr, "%lu-byte regions:           %lu\n", slab_regions[i]->size, nslab_regions);
+        fprintf(stderr, "total %lu-byte slabs:       %lu\n", slab_regions[i]->size, total_slabs);
+        fprintf(stderr, "allocated  %lu-byte slabs:  %lu\n\n", slab_regions[i]->size, used_slabs);
+
+        used_bytes += slab_regions[i]->size * used_slabs;
+        total_bytes += REGION_BYTES * nslab_regions;
+    }
 
     size_t block_regions = 0, total_block_bytes = 0, used_block_objects = 0, free_block_objects = 0, used_block_bytes = 0;
     calc_blocks(block_region, &block_regions, &total_block_bytes, &used_block_objects, &free_block_objects, &used_block_bytes);
 
-    fprintf(stderr, "--- GC STATS ---\n");
-    fprintf(stderr, "cell regions:      %lu\n", cell_regions);
-    fprintf(stderr, "total cells:       %lu\n", total_cells);
-    fprintf(stderr, "allocated cells:   %lu\n\n", used_cells);
-    fprintf(stderr, "block regions:     %lu\n", block_regions);
-    fprintf(stderr, "total bytes:       %lu\n", total_block_bytes);
-    fprintf(stderr, "allocated objects: %lu\n", used_block_objects);
-    fprintf(stderr, "free objects:      %lu\n", free_block_objects);
-    fprintf(stderr, "allocated bytes:   %lu\n\n", used_block_bytes);
-    fprintf(stderr, "collections:       %lu\n", garbage_collections);
-    fprintf(stderr, "total bytes:       %lu\n\n", used_block_bytes + sizeof(struct pscheme_cons_cell)*used_cells);
+    total_bytes += total_block_bytes;
+    used_bytes += used_block_bytes;
+
+    fprintf(stderr, "block regions:             %lu\n", block_regions);
+    fprintf(stderr, "total bytes:               %lu\n", total_block_bytes);
+    fprintf(stderr, "allocated objects:         %lu\n", used_block_objects);
+    fprintf(stderr, "free objects:              %lu\n", free_block_objects);
+    fprintf(stderr, "allocated bytes:           %lu\n\n", used_block_bytes);
+    fprintf(stderr, "collections:               %lu\n", garbage_collections);
+    fprintf(stderr, "live bytes:                %lu\n\n", used_bytes);
+    fprintf(stderr, "total bytes:               %lu\n\n", total_bytes);
 
     // canary checks
     check_canaries(block_region);
