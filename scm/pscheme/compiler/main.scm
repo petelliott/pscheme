@@ -1,16 +1,28 @@
 (import (scheme base)
+        (scheme file)
         (scheme process-context)
         (srfi 1)
-        (scheme write))
+        (srfi 170)
+        (scheme write)
+        (scheme read))
 
 (import (pscheme base)
         (pscheme getopt)
+        (pscheme path)
         (pscheme compiler backends llvm)
         (pscheme compiler compile)
         (pscheme compiler library)
         (pscheme compiler options))
 
-(define opts (getopt (command-line)
+;; load pre-define command-line from .pscheme-config
+(define executable (read-symlink "/proc/self/exe"))
+(define config-file (string-append (dirname executable) "/." (basename executable) "-pscmconfig"))
+(define hard-config
+  (if (file-exists? config-file)
+      (call-with-input-file config-file read)
+      '()))
+
+(define opts (getopt (cons (car (command-line)) (append hard-config (cdr (command-line))))
                      '((include #\I #t)
                        (lib #\L #t)
                        (output #\o #t)
