@@ -2,12 +2,28 @@
   (import (scheme base)
           (pscheme options)
           (pscheme ffi))
-  (export file-info?
+  (export read-symlink
+          file-info?
           file-info:device file-info:inode file-info:mode file-info:nlinks
           file-info:uid file-info:gid file-info:rdev file-info:size file-info:blksize
           file-info:blocks file-info:atime file-info:mtime file-info:ctime
           file-info)
   (begin
+
+    ;;; 3.3  File system
+
+    (define _readlink (ff->scheme int readlink (char* pathname) (char* buf) (int bufsiz)))
+
+    (define (read-symlink-inner fname n)
+      (define str (make-string n))
+      (define nread (_readlink fname str n))
+      (cond
+       ((negative? nread) (error "readlink error TODO: errno" fname))
+       ((= nread n) (read-symlink-inner fname (* n 4)))
+       (else str)))
+
+    (define (read-symlink fname)
+      (read-symlink-inner fname 1024))
 
     (define-record-type file-info
       (make-file-info)
