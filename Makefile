@@ -6,8 +6,17 @@ RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/rest.o runtime/apply.o \
 	         runtime/main.o runtime/symbol_table.o runtime/rangetable.o
 RUNTIME_TARGET=runtime/runtime.a
 
+pscheme: $(RUNTIME_TARGET) pscheme1
+	./pscheme1 -p --fresh ./scm/pscheme/compiler/main.scm -o pscheme
+
 pscheme1: $(RUNTIME_TARGET)
-	./pscheme0.sh -pg ./scm/pscheme/compiler/main.scm -o pscheme1
+	./pscheme0.sh -p --fresh ./scm/pscheme/compiler/main.scm -o pscheme1
+
+dev: $(RUNTIME_TARGET)
+	./pscheme -pg ./scm/pscheme/compiler/main.scm -o pscheme-dev
+
+dev0: $(RUNTIME_TARGET)
+	./pscheme0.sh -pg ./scm/pscheme/compiler/main.scm -o pscheme-dev
 
 $(RUNTIME_TARGET): $(RUNTIME_OBJS)
 	ar cr $@ $?
@@ -19,7 +28,7 @@ $(RUNTIME_TARGET): $(RUNTIME_OBJS)
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 
-.PHONY: clean check pscheme1
+.PHONY: clean check pscheme1 pscheme dev
 
 clean:
 	rm -rf runtime/*.a runtime/*.o
@@ -29,4 +38,5 @@ clean:
 	rm -rf pscheme1
 
 check:
+	cmp pscheme1 pscheme
 	test/test
