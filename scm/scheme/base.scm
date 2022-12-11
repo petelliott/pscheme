@@ -34,7 +34,7 @@
    vector-append vector-fill!
    ;; 6.9: Bytevectors
    ;; 6.10: Control features
-   procedure? apply map for-each dynamic-wind
+   procedure? apply map for-each string-for-each vector-for-each dynamic-wind
    ;; 6.11: Exceptions
    error
    ;; 6.12. Environments and evaluation
@@ -933,6 +933,36 @@
       (if (null? lists)
           (for-each1 proc list1)
           (for-each-inner proc (cons list1 lists))))
+
+    (define (string-for-each1 proc string i l)
+      (when (< i l)
+        (proc (string-ref string i))
+        (string-for-each1 proc string (+ i 1) l)))
+
+    (define (string-for-each-inner proc strings i l)
+      (when (< i l)
+        (apply proc (map (lambda (s) (string-ref s i)) strings))
+        (string-for-each-inner proc strings (+ i 1) l)))
+
+    (define (string-for-each proc string1 . strings)
+      (if (null? strings)
+          (string-for-each1 proc string1 0 (string-length string1))
+          (string-for-each-inner proc (cons string1 strings) 0 (apply min (map string-length (cons string1 strings))))))
+
+    (define (vector-for-each1 proc vector i l)
+      (when (< i l)
+        (proc (vector-ref vector i))
+        (vector-for-each1 proc vector (+ i 1) l)))
+
+    (define (vector-for-each-inner proc vectors i l)
+      (when (< i l)
+        (apply proc (map (lambda (s) (vector-ref s i)) vectors))
+        (vector-for-each-inner proc vectors (+ i 1) l)))
+
+    (define (vector-for-each proc vector1 . vectors)
+      (if (null? vectors)
+          (vector-for-each1 proc vector1 0 (vector-length vector1))
+          (vector-for-each-inner proc (cons vector1 vectors) 0 (apply min (map vector-length (cons vector1 vectors))))))
 
     ;; TODO: an acutal dynamic-wind
     (define (dynamic-wind before thunk after)
