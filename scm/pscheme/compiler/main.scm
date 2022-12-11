@@ -29,7 +29,8 @@
                        (debug #\g #f)
                        (ir #\z #f)
                        (progress #\p #f)
-                       (fresh #f #f))))
+                       (fresh #f #f)
+                       (library #f #f))))
 
 (add-to-load-path ".")
 (for-each add-to-load-path
@@ -44,6 +45,8 @@
             (debug  (assoc-ref 'debug opts))
             (progress (assoc-ref 'progress opts))
             (fresh (assoc-ref 'fresh opts)))
-           (compile-project llvm (cadr (assoc 'rest opts))
-                            (or (assoc-ref 'output opts) "a.out")
-                            libs))
+           (if (assoc-ref 'library opts)
+               (precompile-lib llvm (cadr (assoc 'rest opts)))
+               (compile-project llvm (cadr (assoc 'rest opts))
+                                (or (assoc-ref 'output opts) "a.out")
+                                libs)))

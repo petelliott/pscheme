@@ -4,7 +4,10 @@ CFLAGS=-Wall -g -I. -fPIE -O2
 RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/rest.o runtime/apply.o \
 	         runtime/gdb_exts.o runtime/ports.o runtime/srfi-170.o \
 	         runtime/main.o runtime/symbol_table.o runtime/rangetable.o
-RUNTIME_TARGET=runtime/runtime.a
+RUNTIME_TARGET=runtime/pscheme-runtime.a
+
+bootstrap: pscheme
+	for libfile in `find scm/ -name '*.scm'`; do ./pscheme -p --library $$libfile ; done
 
 pscheme: $(RUNTIME_TARGET) pscheme1
 	./pscheme1 -p --fresh ./scm/pscheme/compiler/main.scm -o pscheme
@@ -28,7 +31,7 @@ $(RUNTIME_TARGET): $(RUNTIME_OBJS)
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 
-.PHONY: clean check pscheme1 pscheme dev
+.PHONY: clean check pscheme1 pscheme dev dev0 install
 
 clean:
 	rm -rf runtime/*.a runtime/*.o
@@ -40,3 +43,6 @@ clean:
 check:
 	cmp pscheme1 pscheme
 	test/test
+
+install:
+	while read i; do install -pTD $$i; done < install-list

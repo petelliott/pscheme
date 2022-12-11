@@ -5,6 +5,7 @@
           should-fresh-compile
           compile-file
           add-linked-object
+          precompile-lib
           linking-context)
   (import (scheme base)
           (scheme file)
@@ -92,6 +93,10 @@
                  (status-message "[COMPILED]    ~a\n" filename))
               (status-message "[CACHED]      ~a\n" filename))))
       (add-linked-object objfile))
+
+    (define (precompile-lib backend filename)
+      (parameterize ((current-backend backend))
+        (compile-file filename 'library)))
 
     (define (compile-project backend filename outfile linked-libs)
       (parameterize ((current-backend backend))
