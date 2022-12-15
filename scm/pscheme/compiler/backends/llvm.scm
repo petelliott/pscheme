@@ -400,7 +400,7 @@
         (f "    store i64 ~a, i64* ~a~a\n" (strip-spans (value)) (strip-spans (name)) (location))
         (preop)
         (ret-unspec))
-       ((call ,value ,@value) (fn args)
+       ((call ,bool ,value ,@value) (tail fn args)
         (define u (unique))
         (define args2 (strip-spans (args)))
         (f "    %call_~a_a = lshr i64 ~a, 4~a\n" u (strip-spans (fn)) (location))

@@ -284,6 +284,7 @@
                  (sloppy-map (lambda (f) (f 'raw)) args))
                 ((eq? (car rest) 'span)
                  (sloppy-map (lambda (f) (f 'span)) args))
+                ((eq? (car rest) 'individual) args)
                 (else (error "unexpected arguments to pass recursion:" rest))))
              args))
        args))

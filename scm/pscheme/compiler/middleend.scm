@@ -43,7 +43,7 @@
             form))
       (lb-param (cons sform (lb-param))))
 
-    ;;; conversion from ref-scheme to ir
+    ;;; conversion from tail-ref-scheme to ir
 
     (define (normal-args args)
       (if (pair? args)
@@ -88,7 +88,7 @@
        (else
         ident)))
 
-    (define-pass irconvert1 (ref-scheme)
+    (define-pass irconvert1 (tail-ref-scheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
         (emit `(entry ,(name) ,@(with-list-block (decls)))))
@@ -154,8 +154,8 @@
         (ident->reg (ident)))
        ((closure ,expression ,@identifier) (expr idents)
         (emit-tmp-op `(closure ,(expr) ,@(map ident->reg (idents)))))
-       ((call ,expression ,@expression) (fn args)
-        (emit-tmp-op `(call ,(fn) ,@(args))))))
+       ((call ,bool ,expression ,@expression) (tail fn args)
+        (emit-tmp-op `(call ,(tail) ,(fn) ,@(args))))))
 
     (define (irconvert rs program-or-lib)
       (parameterize ((tl-param '()))

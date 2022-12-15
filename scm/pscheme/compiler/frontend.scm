@@ -235,9 +235,42 @@
                (pscm-warn "wrong number of arguments to function ~a" (cons sym shape))))))
         `(call ,(f) ,@(args)))))
 
+    (define at-tail (make-parameter #f))
+    (define-pass mark-tails (ref-scheme)
+      (expression
+       ((lambda ,lambda-name (,@box) ,@proc-toplevel) (name args body)
+        (define rbody (reverse (body 'individual)))
+        (if (null? rbody)
+            `(lambda ,(name) (,@(args)))
+            (let ((tail (car rbody))
+                  (nontail (reverse (cdr rbody))))
+              `(lambda ,(name) (,@(args))
+                       ,@(parameterize ((at-tail #f)) (map (lambda (f) (f)) nontail))
+                       ,(parameterize ((at-tail #t)) (tail))))))
+
+       ((set! ,identifier ,expression) (name expr)
+        (parameterize ((at-tail #f)) `(set! ,(name) ,(expr))))
+
+       ((builtin ,symbol ,@expression) (sym exprs)
+        (parameterize ((at-tail #f)) `(builtin ,(sym) ,@(exprs))))
+
+       ((call ,expression ,@expression) (fn args)
+        (define is-tail-call (at-tail))
+        (parameterize ((at-tail #f)) `(call ,is-tail-call ,(fn) ,@(args)))))
+
+      (proc-toplevel
+       ((begin ,@proc-toplevel) (body)
+        (define rbody (reverse (body 'individual)))
+        (if (null? rbody)
+            '(begin)
+            (let ((tail (car rbody))
+                  (nontail (reverse (cdr rbody))))
+              `(begin ,@(parameterize ((at-tail #f)) (map (lambda (f) (f)) nontail))
+                      ,(tail)))))))
+
     (define in-var (make-parameter #f))
 
-    (define-pass flag-sets (ref-scheme)
+    (define-pass flag-sets (tail-ref-scheme)
       (proc-toplevel
        ((define ,identifier ,expression) (ident expr)
         (parameterize ((in-var (and (var-metadata? (last (ident 'raw)))
@@ -273,7 +306,7 @@
        (else
         (list lst))))
 
-    (define-pass box-sets (ref-scheme)
+    (define-pass box-sets (tail-ref-scheme)
       (proc-toplevel
        ((define ,identifier ,expression) (ident expr)
         (if (should-box (ident 'raw))
@@ -317,6 +350,7 @@
        normalize-forms
        resolve-names
        check-args
+       mark-tails
        flag-sets
        box-sets))
 

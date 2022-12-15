@@ -19,6 +19,7 @@
           box?
           unbox
           ref-scheme
+          tail-ref-scheme
           ir
           ssa-ir)
   (begin
@@ -154,6 +155,17 @@
          (lambda ,lambda-name (,@box) ,@proc-toplevel)
          (closure ,expression ,@identifier)))))
 
+    (define tail-ref-scheme
+      (edit-language
+       ref-scheme
+       (-
+        (expression
+         (call ,expression ,@expression)))
+       (+
+        (bool boolean?)
+        (expression
+         (call ,bool ,expression ,@expression)))))
+
     (define ir
       (language
        (var-metadata var-metadata?)
@@ -161,6 +173,7 @@
        (number number?)
        (any any?)
        (string string?)
+       (bool boolean?)
        (program
         (,@toplevel-def))
        (library-name
@@ -208,7 +221,7 @@
         (closure-ref (closure ,number ,var-metadata))
         (global-ref ,identifier)
         (global-set! ,identifier ,value)
-        (call ,value ,@value))))
+        (call ,bool ,value ,@value))))
 
     (define ssa-ir
       (edit-language
