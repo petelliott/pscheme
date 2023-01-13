@@ -248,6 +248,18 @@
                        ,@(parameterize ((at-tail #f)) (map (lambda (f) (f)) nontail))
                        ,(parameterize ((at-tail #t)) (tail))))))
 
+       ((if ,expression ,expression ,expression) (condition tbranch fbranch)
+        `(if ,(parameterize ((at-tail #f)) (condition)) ,(tbranch) ,(fbranch)))
+
+       ((begin ,@expression) (body)
+        (define rbody (reverse (body 'individual)))
+        (if (null? rbody)
+            '(begin)
+            (let ((tail (car rbody))
+                  (nontail (reverse (cdr rbody))))
+              `(begin ,@(parameterize ((at-tail #f)) (map (lambda (f) (f)) nontail))
+                      ,(tail)))))
+
        ((set! ,identifier ,expression) (name expr)
         (parameterize ((at-tail #f)) `(set! ,(name) ,(expr))))
 
@@ -266,7 +278,11 @@
             (let ((tail (car rbody))
                   (nontail (reverse (cdr rbody))))
               `(begin ,@(parameterize ((at-tail #f)) (map (lambda (f) (f)) nontail))
-                      ,(tail)))))))
+                      ,(tail)))))
+
+       ((define ,identifier ,expression) (name val)
+        `(define ,(name) ,(parameterize ((at-tail #f)) (val))))))
+
 
     (define in-var (make-parameter #f))
 
