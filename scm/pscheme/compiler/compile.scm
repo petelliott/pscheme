@@ -69,6 +69,7 @@
                   (<= omtime fmtime))))))
 
     (define should-fresh-compile (make-parameter #f))
+    (define compile-tasks (make-parameter #f))
 
     (define (status-message fmt . args)
       (when (option 'progress)
@@ -81,28 +82,37 @@
       (define _dummy (status-message "[READ]        ~a" filename))
       (define program (read-file filename))
       (parameterize ((should-fresh-compile (needs-compile filename)))
-        (status-message "[MACROEXPAND] ~a" filename)
+        (status-message "[MACROEXPAND] ~a\n" filename)
         (let ((me (map import-pass program)))
           (if (should-fresh-compile)
-              (begin
-                 (status-message "[COMPILING]   ~a" filename)
-                 (let* ((fir (map frontend me))
-                        (mir (middleend fir program-or-lib)))
-                   (writeir-for filename mir)
-                   ((backend-compile (current-backend)) mir filename objfile))
-                 (status-message "[COMPILED]    ~a\n" filename))
+              (compile-tasks
+               (cons
+                (lambda ()
+                  (status-message "[COMPILING]   ~a" filename)
+                  (let* ((fir (map frontend me))
+                         (mir (middleend fir program-or-lib)))
+                    (writeir-for filename mir)
+                    ((backend-compile (current-backend)) mir filename objfile))
+                  (status-message "[COMPILED]    ~a\n" filename))
+                (compile-tasks)))
               (status-message "[CACHED]      ~a\n" filename))))
       (add-linked-object objfile))
+
+    (define (finish-compiles)
+      (for-each (lambda (task) (task)) (compile-tasks)))
 
     (define (precompile-lib backend filename)
       (parameterize ((current-backend backend))
         (compile-file filename 'library)))
 
     (define (compile-project backend filename outfile linked-libs)
-      (parameterize ((current-backend backend))
+      (parameterize ((current-backend backend)
+                     (compile-tasks '()))
         (linking-context outfile
                          (lambda ()
                            (for-each (lambda (lib) (add-linked-object lib)) linked-libs)
-                           (compile-file filename 'program)))))
+                           (compile-file filename 'program)
+                           (finish-compiles)
+                           ))))
 
     ))

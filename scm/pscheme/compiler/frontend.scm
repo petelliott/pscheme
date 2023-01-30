@@ -377,7 +377,6 @@
     (define import-pass
       (concat-passes
        import-and-macroexpand
-       ;remove-syntax-nodes
        track-defines))
 
     (define frontend
