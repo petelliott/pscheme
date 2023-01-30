@@ -1,5 +1,7 @@
 (define-library (pscheme compiler file)
-  ;; TODO: fix compiler to not require this export-before-import shit
+  (import (scheme base)
+          (scheme char)
+          (pscheme compiler error))
   (export make-span
           span?
           span-form
@@ -15,9 +17,6 @@
           strip-spans
           first-span
           current-span)
-  (import (scheme base)
-          (scheme char)
-          (pscheme compiler error))
   (begin
 
     (define-record-type span
