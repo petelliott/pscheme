@@ -1,6 +1,7 @@
 (define-library (scheme base)
   (import (pscheme ffi)
-          (pscheme options))
+          (pscheme options)
+          (scheme write))
   (export
    ;; 7.3: Derived expression types
    cond case and or when unless let let* letrec letrec* do quasiquote
@@ -974,8 +975,13 @@
     ;;; 6.11: Exceptions
 
     (define (error message . objs)
+      (write-string "\x1b;[31;1mERROR:\x1b;[0m " (current-error-port))
       ;; TODO: this is obviously fake lol
       (write-string message (current-error-port))
+      (for-each (lambda (obj)
+                  (write-char #\space (current-error-port))
+                  (write obj (current-error-port)))
+                objs)
       (newline (current-error-port))
       (builtin ffi-call (ffi-symbol abort)))
 
