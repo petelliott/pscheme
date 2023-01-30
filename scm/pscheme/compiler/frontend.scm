@@ -32,6 +32,16 @@
               (strip-syntax-nodes (cdr form))))
        (else form)))
 
+    (define (macroexpand1 name args cont)
+      (define n (name 'raw))
+      (cond
+       ((or (and (syntax-node? n)
+                 (lookup-syntax (syntax-node-sym n) (syntax-node-env n)))
+            (lookup-syntax n (current-library))) =>
+            (lambda (transformer)
+              (cont (transform-syntax transformer (args 'span)))))
+       (else `(,(name) ,@(args)))))
+
     (define-pass import-and-macroexpand (lscheme)
       (program-toplevel
        ((define-library ,library-name ,@library-declaration) (name decls)
@@ -59,18 +69,17 @@
       (proc-toplevel
        ((define-syntax ,identifier ,syntax-transformer) (ident transformer)
         (add-library-syntax! (current-library) (strip-syntax-nodes (ident 'raw)) (strip-spans (strip-syntax-nodes (transformer))))
-        '(begin)))
+        '(begin))
+
+       ((define ,identifier ,expression) (id exp)
+        `(define ,(id 'span) ,(exp 'span)))
+
+       ((define (,identifier ,@identifier) ,@proc-toplevel) (name args body)
+        `(define (,(name 'span) ,@(args 'span)) ,@(body 'span))))
 
       (expression
        ((,expression ,@expression) (name args)
-        (define n (name 'raw))
-        (cond
-         ((or (and (syntax-node? n)
-                   (lookup-syntax (syntax-node-sym n) (syntax-node-env n)))
-              (lookup-syntax n (current-library))) =>
-              (lambda (transformer)
-                (import-and-macroexpand (transform-syntax transformer (args 'span)))))
-         (else `(,(name) ,@(args)))))))
+        (macroexpand1 name args import-and-macroexpand))))
 
     (define-pass remove-syntax-nodes (lscheme)
       ($ symbol (s)
@@ -94,6 +103,16 @@
         (add-library-define! (current-library) (ident 'raw) (args 'raw))
         `(define (,(ident) ,@(args)) ,@(body 'span)))
        (,expression (expr) (expr 'span))))
+
+    (define-pass macroexpand-expressions (lscheme)
+      (program-toplevel
+       ((define-library ,library-name ,@library-declaration) (name decls)
+        (parameterize ((current-library (lookup-library (name 'raw))))
+          `(define-library ,(name) ,@(decls)))))
+
+      (expression
+       ((,expression ,@expression) (name args)
+        (macroexpand1 name args macroexpand-expressions))))
 
     (define-pass normalize-forms (lscheme)
       ($ literal (l)
@@ -358,11 +377,13 @@
     (define import-pass
       (concat-passes
        import-and-macroexpand
-       remove-syntax-nodes
+       ;remove-syntax-nodes
        track-defines))
 
     (define frontend
       (concat-passes
+       macroexpand-expressions
+       remove-syntax-nodes
        normalize-forms
        resolve-names
        check-args
