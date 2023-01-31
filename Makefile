@@ -10,10 +10,10 @@ bootstrap: pscheme
 	for libfile in `find scm/ -name '*.scm'`; do ./pscheme -p --library $$libfile ; done
 
 pscheme: $(RUNTIME_TARGET) pscheme1
-	./pscheme1 -p --fresh ./scm/pscheme/compiler/main.scm -o pscheme
+	./pscheme1 -p --fresh --release ./scm/pscheme/compiler/main.scm -o pscheme
 
 pscheme1: $(RUNTIME_TARGET)
-	./pscheme0.sh -p --fresh ./scm/pscheme/compiler/main.scm -o pscheme1
+	./pscheme0.sh -p --fresh --release ./scm/pscheme/compiler/main.scm -o pscheme1
 
 dev: $(RUNTIME_TARGET)
 	./pscheme -pg ./scm/pscheme/compiler/main.scm -o pscheme-dev

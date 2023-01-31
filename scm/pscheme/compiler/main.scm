@@ -29,6 +29,7 @@
                        (debug #\g #f)
                        (ir #\z #f)
                        (progress #\p #f)
+                       (release #f #f)
                        (fresh #f #f)
                        (library #f #f))))
 
@@ -42,7 +43,7 @@
                    opts)))
 
 (optionize ((ir (assoc-ref 'ir opts))
-            (debug  (assoc-ref 'debug opts))
+            (debug (or (assoc-ref 'release opts) (assoc-ref 'debug opts)))
             (progress (assoc-ref 'progress opts))
             (fresh (assoc-ref 'fresh opts)))
            (if (assoc-ref 'library opts)
