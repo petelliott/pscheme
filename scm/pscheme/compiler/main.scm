@@ -25,6 +25,7 @@
 (define opts (getopt (cons (car (command-line)) (append hard-config (cdr (command-line))))
                      '((include #\I #t)
                        (lib #\L #t)
+                       (syslib #\l #t)
                        (output #\o #t)
                        (debug #\g #f)
                        (ir #\z #f)
@@ -41,6 +42,9 @@
 (define libs
   (map cdr (filter (lambda (m) (eq? (car m) 'lib))
                    opts)))
+(define syslibs
+  (map cdr (filter (lambda (m) (eq? (car m) 'syslib))
+                   opts)))
 
 (optionize ((ir (assoc-ref 'ir opts))
             (debug (or (assoc-ref 'release opts) (assoc-ref 'debug opts)))
@@ -50,4 +54,4 @@
                (precompile-lib llvm (cadr (assoc 'rest opts)))
                (compile-project llvm (cadr (assoc 'rest opts))
                                 (or (assoc-ref 'output opts) "a.out")
-                                libs)))
+                                libs syslibs)))

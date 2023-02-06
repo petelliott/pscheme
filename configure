@@ -4,7 +4,7 @@ PREFIX="/usr/local"
 
 # configure local pschemes
 script_dir=$(dirname $(realpath $0))
-localconfig="(\"-I${script_dir}/scm\" \"-L${script_dir}/runtime/pscheme-runtime.a\")"
+localconfig="(\"-I${script_dir}/scm\" \"-L${script_dir}/runtime/pscheme-runtime.a\" \"-ldwarf\")"
 
 echo $localconfig > .pscheme1-pscmconfig
 echo $localconfig > .pscheme-pscmconfig
@@ -12,7 +12,7 @@ echo $localconfig > .pscheme-dev-pscmconfig
 
 # configure install pscheme
 
-echo "(\"-I${PREFIX}/share/pscheme\" \"-L${PREFIX}/lib/pscheme-runtime.a\")" > .pscheme-prefix-pscmconfig
+echo "(\"-I${PREFIX}/share/pscheme\" \"-L${PREFIX}/lib/pscheme-runtime.a\" \"-ldwarf\")" > .pscheme-prefix-pscmconfig
 
 rm install-list
 echo "./runtime/pscheme-runtime.a ${PREFIX}/lib/pscheme-runtime.a" >> install-list

@@ -774,9 +774,10 @@
       (sys-system (format "llc --relocation-model=pic -filetype=obj ~a -o ~a" llfile objfile))
       objfile)
 
-    (define (llvm-link objs outfile)
-      (sys-system (format "clang ~a -o ~a"
+    (define (llvm-link objs syslibs outfile)
+      (sys-system (format "clang ~a ~a -o ~a"
                           (string-join " " objs)
+                          (string-join " " (map (lambda (slib) (format "-l~a" slib)) syslibs))
                           outfile)))
 
     (define (llvm-objfile-name filename)

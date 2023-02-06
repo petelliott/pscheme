@@ -29,7 +29,8 @@
     (define-record-type linker-options
       (make-linker-options objects)
       linker-options?
-      (objects linker-objs set-linker-objs!))
+      (objects linker-objs set-linker-objs!)
+      (syslibs linker-syslibs set-linker-syslibs!))
 
     (define linker-opts (make-parameter (make-linker-options '())))
 
@@ -39,7 +40,7 @@
     (define (linking-context outfile proc)
       (parameterize ((linker-opts (make-linker-options '())))
         (proc)
-        ((backend-link (current-backend)) (linker-objs (linker-opts)) outfile)))
+        ((backend-link (current-backend)) (linker-objs (linker-opts)) (linker-syslibs (linker-opts)) outfile)))
 
     (define (writeir ir port)
       (parameterize ((current-output-port port))
@@ -104,14 +105,14 @@
       (parameterize ((current-backend backend))
         (compile-file filename 'library)))
 
-    (define (compile-project backend filename outfile linked-libs)
+    (define (compile-project backend filename outfile libs syslibs)
       (parameterize ((current-backend backend)
                      (compile-tasks '()))
         (linking-context outfile
                          (lambda ()
-                           (for-each (lambda (lib) (add-linked-object lib)) linked-libs)
+                           (for-each (lambda (lib) (add-linked-object lib)) libs)
+                           (set-linker-syslibs! (linker-opts) syslibs)
                            (compile-file filename 'program)
-                           (finish-compiles)
-                           ))))
+                           (finish-compiles)))))
 
     ))
