@@ -976,14 +976,13 @@
 
     (define (error message . objs)
       (write-string "\x1b;[31;1mERROR:\x1b;[0m " (current-error-port))
-      ;; TODO: this is obviously fake lol
       (write-string message (current-error-port))
       (for-each (lambda (obj)
                   (write-char #\space (current-error-port))
                   (write obj (current-error-port)))
                 objs)
       (newline (current-error-port))
-      (builtin ffi-call (ffi-symbol abort)))
+      (builtin ffi-call (ffi-symbol pscheme_abort)))
 
     ;;; 6.12. Environments and evaluation
     ;;; 6.13: Input and Output

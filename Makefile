@@ -3,7 +3,8 @@ CFLAGS=-Wall -g -I. -fPIE -O2
 
 RUNTIME_OBJS=runtime/gc.o runtime/object.o runtime/rest.o runtime/apply.o \
 	         runtime/gdb_exts.o runtime/ports.o runtime/srfi-170.o \
-	         runtime/main.o runtime/symbol_table.o runtime/rangetable.o
+	         runtime/main.o runtime/symbol_table.o runtime/rangetable.o \
+	         runtime/error.o
 RUNTIME_TARGET=runtime/pscheme-runtime.a
 
 bootstrap: pscheme
